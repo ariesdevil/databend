@@ -139,7 +139,7 @@ impl InputFormatTextBase for InputFormatCSV {
                         field_end_idx += n_column;
                         continue;
                     }
-                    _ => return Err(batch.error(&e.message(), &builder.ctx, start, i)),
+                    OnErrorMode::SkipFileNum(n) => {}
                 }
             }
             start = *end;

@@ -40,6 +40,7 @@ use common_expression::DataBlock;
 use common_expression::TableField;
 use common_expression::TableSchema;
 use common_expression::TableSchemaRef;
+use common_meta_app::principal::OnErrorMode;
 use common_meta_app::principal::UserStageInfo;
 use common_pipeline_core::Pipeline;
 use common_settings::Settings;
@@ -58,6 +59,7 @@ use crate::input_formats::input_pipeline::RowBatchTrait;
 use crate::input_formats::input_split::DynData;
 use crate::input_formats::input_split::FileInfo;
 use crate::input_formats::InputContext;
+use crate::input_formats::InputError;
 use crate::input_formats::InputFormat;
 use crate::input_formats::SplitInfo;
 
@@ -159,7 +161,13 @@ impl InputFormatPipe for ParquetFormatPipe {
         let obj = op.object(&split_info.file.path);
         let mut reader = obj.reader().await?;
         let input_fields = Arc::new(get_used_fields(&meta.file.fields, &ctx.schema)?);
-        RowGroupInMemory::read_async(&mut reader, meta.meta.clone(), input_fields).await
+        RowGroupInMemory::read_async(
+            &mut reader,
+            meta.meta.clone(),
+            input_fields,
+            split_info.file.path.clone(),
+        )
+        .await
     }
 }
 
@@ -208,6 +216,9 @@ pub struct RowGroupInMemory {
     pub fields_to_read: Arc<Vec<Field>>,
     pub field_meta_indexes: Vec<Vec<usize>>,
     pub field_arrays: Vec<Vec<Vec<u8>>>,
+
+    // for track error
+    pub file_name: String,
 }
 
 impl RowBatchTrait for RowGroupInMemory {
@@ -225,6 +236,7 @@ impl RowGroupInMemory {
         reader: &mut R,
         meta: RowGroupMetaData,
         fields: Arc<Vec<Field>>,
+        file_name: String,
     ) -> Result<Self> {
         let field_names = fields.iter().map(|x| x.name.as_str()).collect::<Vec<_>>();
         let field_meta_indexes = split_column_metas_by_field(meta.columns(), &field_names);
@@ -239,6 +251,7 @@ impl RowGroupInMemory {
             field_meta_indexes,
             field_arrays: filed_arrays,
             fields_to_read: fields,
+            file_name,
         })
     }
 
@@ -246,6 +259,7 @@ impl RowGroupInMemory {
         reader: &mut R,
         meta: RowGroupMetaData,
         fields: Arc<Vec<Field>>,
+        file_name: String,
     ) -> Result<Self> {
         let field_names = fields.iter().map(|x| x.name.as_str()).collect::<Vec<_>>();
         let field_meta_indexes = split_column_metas_by_field(meta.columns(), &field_names);
@@ -260,6 +274,7 @@ impl RowGroupInMemory {
             field_meta_indexes,
             field_arrays: filed_arrays,
             fields_to_read: fields,
+            file_name,
         })
     }
 
@@ -332,9 +347,41 @@ impl BlockBuilderTrait for ParquetBlockBuilder {
 
     fn deserialize(&mut self, mut batch: Option<RowGroupInMemory>) -> Result<Vec<DataBlock>> {
         if let Some(rg) = batch.as_mut() {
-            let chunk = rg.get_arrow_chunk()?;
-            let block = DataBlock::from_arrow_chunk(&chunk, &self.ctx.data_schema())?;
+            // let chunk = rg.get_arrow_chunk()?;
+            // let block = DataBlock::from_arrow_chunk(&chunk, &self.ctx.data_schema())?;
 
+            let block_result = rg
+                .get_arrow_chunk()
+                .and_then(|chunk| DataBlock::from_arrow_chunk(&chunk, &self.ctx.data_schema()));
+
+            if let Err(e) = block_result {
+                match self.ctx.on_error_mode {
+                    OnErrorMode::Continue | OnErrorMode::SkipFileNum(_) => {
+                        let file_name = rg.file_name.clone();
+                        if let Some(ref on_error_map) = self.ctx.on_error_map {
+                            on_error_map
+                                .entry(file_name)
+                                .and_modify(|x| {
+                                    for (k, v) in error_map.clone() {
+                                        x.entry(k).and_modify(|y| y.num += v.num).or_insert(v);
+                                    }
+                                })
+                                .or_insert(HashMap::from([(e.code(), InputError {
+                                    err: e,
+                                    num: 1,
+                                })]));
+                            return Ok(vec![]);
+                        } else {
+                            return Err(e);
+                        }
+                    }
+                    OnErrorMode::AbortNum(_) => {
+                        return Err(e);
+                    }
+                }
+            }
+
+            let block = block_result.unwrap();
             let block_total_rows = block.num_rows();
             let num_rows_per_block = self.ctx.block_compact_thresholds.max_rows_per_block;
             let blocks: Vec<DataBlock> = (0..block_total_rows)
@@ -390,6 +437,7 @@ impl AligningStateTrait for AligningState {
                 self.split_info.file.path,
                 size,
             );
+            let file_name = self.split_info.file.path.clone();
             let mut cursor = Cursor::new(file_in_memory);
             let file_meta = read_metadata(&mut cursor)?;
             let infer_schema = infer_schema(&file_meta)?;
@@ -400,6 +448,7 @@ impl AligningStateTrait for AligningState {
                     &mut cursor,
                     row_group,
                     fields.clone(),
+                    file_name.clone(),
                 )?)
             }
             tracing::info!(
