@@ -268,6 +268,29 @@ pub trait InputFormatTextBase: Sized + Send + Sync + 'static {
         });
         Ok(())
     }
+
+    fn on_error_skipfile(
+        columns: &mut Vec<TypeDeserializerImpl>,
+        num_rows: usize,
+        skipfile_num: u64,
+        error_count: &AtomicU64,
+        error_map: &mut HashMap<u16, InputError>,
+        e: ErrorCode,
+    ) {
+        columns.iter_mut().for_each(|c| {
+            // check if parts of columns inserted data, if so, pop it.
+            if c.len() > num_rows {
+                c.pop_data_value().expect("must success");
+            }
+        });
+
+        if skipfile_num <= 1 || error_count.fetch_add(1, Ordering::Relaxed) >= skipfile_num - 1 {
+            error_map
+                .entry(e.code())
+                .and_modify(|input_error| input_error.num += 1)
+                .or_insert(InputError { err: e, num: 1 });
+        }
+    }
 }
 
 pub struct InputFormatTextPipe<T> {
@@ -457,7 +480,7 @@ pub struct BlockBuilder<T> {
 }
 
 impl<T: InputFormatTextBase> BlockBuilder<T> {
-    fn flush(&mut self) -> Result<Vec<DataBlock>> {
+    fn flush(&mut self, file_name: String) -> Result<Vec<DataBlock>> {
         let columns: Vec<Column> = self
             .mutable_columns
             .iter_mut()
@@ -473,7 +496,9 @@ impl<T: InputFormatTextBase> BlockBuilder<T> {
         if columns.is_empty() || columns[0].len() == 0 {
             Ok(vec![])
         } else {
-            Ok(vec![DataBlock::new_from_columns(columns)])
+            Ok(vec![
+                DataBlock::new_from_columns(columns).attach_filename(file_name),
+            ])
         }
     }
 
@@ -518,7 +543,7 @@ impl<T: InputFormatTextBase> BlockBuilderTrait for BlockBuilder<T> {
             let file_name = b.split_info.file.path.clone();
             self.num_rows += b.row_ends.len();
             let r = T::deserialize(self, b)?;
-            self.merge_map(r, file_name);
+            self.merge_map(r, file_name.clone());
             let mem = self.memory_size();
             tracing::debug!(
                 "chunk builder added new batch: row {} size {}",
@@ -528,12 +553,12 @@ impl<T: InputFormatTextBase> BlockBuilderTrait for BlockBuilder<T> {
             if self.num_rows >= self.ctx.block_compact_thresholds.min_rows_per_block
                 || mem > self.ctx.block_compact_thresholds.max_bytes_per_block
             {
-                self.flush()
+                self.flush(file_name)
             } else {
                 Ok(vec![])
             }
         } else {
-            self.flush()
+            self.flush("".to_string())
         }
     }
 }

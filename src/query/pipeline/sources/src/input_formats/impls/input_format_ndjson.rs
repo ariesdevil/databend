@@ -127,7 +127,18 @@ impl InputFormatTextBase for InputFormatNDJson {
                             start = *end;
                             continue;
                         }
-                        _ => return Err(batch.error(&e.message(), &builder.ctx, start, i)),
+                        OnErrorMode::SkipFileNum(n) => {
+                            Self::on_error_skipfile(
+                                columns,
+                                num_rows,
+                                n,
+                                &builder.ctx.on_error_count,
+                                &mut error_map,
+                                e.clone(),
+                            );
+                            start = *end;
+                            continue;
+                        }
                     }
                 }
             }

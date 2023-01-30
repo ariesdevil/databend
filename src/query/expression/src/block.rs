@@ -44,6 +44,7 @@ pub struct DataBlock {
     columns: Vec<BlockEntry>,
     num_rows: usize,
     meta: Option<BlockMetaInfoPtr>,
+    belong_to: Option<String>,
 }
 
 #[derive(Clone, Debug)]
@@ -66,13 +67,22 @@ pub trait BlockMetaInfo: Debug + Send + Sync {
 impl DataBlock {
     #[inline]
     pub fn new(columns: Vec<BlockEntry>, num_rows: usize) -> Self {
-        DataBlock::new_with_meta(columns, num_rows, None)
+        DataBlock::new_with_meta(columns, num_rows, None, None)
+    }
+
+    pub fn new_with_belong_to(
+        columns: Vec<BlockEntry>,
+        num_rows: usize,
+        belong_to: String,
+    ) -> Self {
+        DataBlock::new_with_meta(columns, num_rows, Some(belong_to), None)
     }
 
     #[inline]
     pub fn new_with_meta(
         columns: Vec<BlockEntry>,
         num_rows: usize,
+        belong_to: Option<String>,
         meta: Option<BlockMetaInfoPtr>,
     ) -> Self {
         debug_assert!(columns.iter().all(|entry| match &entry.value {
@@ -84,6 +94,7 @@ impl DataBlock {
             columns,
             num_rows,
             meta,
+            belong_to,
         }
     }
 
@@ -102,6 +113,11 @@ impl DataBlock {
             .collect();
 
         DataBlock::new(columns, num_rows)
+    }
+
+    #[inline]
+    pub fn attach_filename(self, filename: String) -> Self {
+        Self::new_with_belong_to(self.columns, self.num_rows, filename)
     }
 
     #[inline]
@@ -128,7 +144,12 @@ impl DataBlock {
 
     #[inline]
     pub fn empty_with_meta(meta: BlockMetaInfoPtr) -> Self {
-        DataBlock::new_with_meta(vec![], 0, Some(meta))
+        DataBlock::new_with_meta(vec![], 0, None, Some(meta))
+    }
+
+    #[inline]
+    pub fn empty_with_belong_to(file_name: String) -> Self {
+        DataBlock::new_with_belong_to(vec![], 0, file_name)
     }
 
     #[inline]
@@ -198,6 +219,7 @@ impl DataBlock {
             columns,
             num_rows: self.num_rows,
             meta: self.meta.clone(),
+            belong_to: self.belong_to.clone(),
         }
     }
 
@@ -236,6 +258,7 @@ impl DataBlock {
             columns,
             num_rows: range.end - range.start,
             meta: self.meta.clone(),
+            belong_to: self.belong_to.clone(),
         }
     }
 
@@ -262,6 +285,7 @@ impl DataBlock {
             columns,
             num_rows: self.num_rows,
             meta: self.meta,
+            belong_to: self.belong_to,
         })
     }
 
@@ -292,15 +316,17 @@ impl DataBlock {
             columns,
             num_rows: self.num_rows,
             meta: self.meta,
+            belong_to: self.belong_to,
         })
     }
 
     #[inline]
     pub fn add_meta(self, meta: Option<BlockMetaInfoPtr>) -> Result<Self> {
         Ok(Self {
-            columns: self.columns.clone(),
+            columns: self.columns,
             num_rows: self.num_rows,
             meta,
+            belong_to: self.belong_to,
         })
     }
 

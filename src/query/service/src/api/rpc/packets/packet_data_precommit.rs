@@ -63,6 +63,7 @@ impl PrecommitBlock {
         Ok(PrecommitBlock(DataBlock::new_with_meta(
             vec![],
             0,
+            None,
             block_meta,
         )))
     }

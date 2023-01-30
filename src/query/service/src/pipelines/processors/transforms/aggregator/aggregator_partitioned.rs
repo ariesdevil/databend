@@ -222,6 +222,7 @@ where
             data_blocks.push(DataBlock::new_with_meta(
                 columns,
                 num_rows,
+                None,
                 Some(AggregateInfo::create(bucket as isize)),
             ));
 

@@ -347,8 +347,7 @@ impl BlockBuilderTrait for ParquetBlockBuilder {
 
     fn deserialize(&mut self, mut batch: Option<RowGroupInMemory>) -> Result<Vec<DataBlock>> {
         if let Some(rg) = batch.as_mut() {
-            // let chunk = rg.get_arrow_chunk()?;
-            // let block = DataBlock::from_arrow_chunk(&chunk, &self.ctx.data_schema())?;
+            let file_name = rg.file_name.clone();
 
             let block_result = rg
                 .get_arrow_chunk()
@@ -357,20 +356,22 @@ impl BlockBuilderTrait for ParquetBlockBuilder {
             if let Err(e) = block_result {
                 match self.ctx.on_error_mode {
                     OnErrorMode::Continue | OnErrorMode::SkipFileNum(_) => {
-                        let file_name = rg.file_name.clone();
                         if let Some(ref on_error_map) = self.ctx.on_error_map {
                             on_error_map
-                                .entry(file_name)
+                                .entry(file_name.clone())
                                 .and_modify(|x| {
-                                    for (k, v) in error_map.clone() {
-                                        x.entry(k).and_modify(|y| y.num += v.num).or_insert(v);
-                                    }
+                                    x.entry(e.code()).and_modify(|y| y.num += 1).or_insert(
+                                        InputError {
+                                            err: e.clone(),
+                                            num: 1,
+                                        },
+                                    );
                                 })
                                 .or_insert(HashMap::from([(e.code(), InputError {
                                     err: e,
                                     num: 1,
                                 })]));
-                            return Ok(vec![]);
+                            return Ok(vec![DataBlock::empty_with_belong_to(file_name)]);
                         } else {
                             return Err(e);
                         }
@@ -381,7 +382,7 @@ impl BlockBuilderTrait for ParquetBlockBuilder {
                 }
             }
 
-            let block = block_result.unwrap();
+            let block = block_result.unwrap().attach_filename(file_name);
             let block_total_rows = block.num_rows();
             let num_rows_per_block = self.ctx.block_compact_thresholds.max_rows_per_block;
             let blocks: Vec<DataBlock> = (0..block_total_rows)

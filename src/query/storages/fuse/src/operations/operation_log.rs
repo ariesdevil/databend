@@ -44,7 +44,12 @@ impl AppendOperationLogEntry {
 impl TryFrom<AppendOperationLogEntry> for DataBlock {
     type Error = ErrorCode;
     fn try_from(value: AppendOperationLogEntry) -> Result<Self, Self::Error> {
-        Ok(DataBlock::new_with_meta(vec![], 0, Some(Box::new(value))))
+        Ok(DataBlock::new_with_meta(
+            vec![],
+            0,
+            None,
+            Some(Box::new(value)),
+        ))
     }
 }
 

@@ -109,6 +109,7 @@ impl<'a> Evaluator<'a> {
         let new_blocks = DataBlock::new_with_meta(
             columns,
             self.input_columns.num_rows(),
+            None,
             self.input_columns.get_meta().cloned(),
         );
         let new_evaluator = Evaluator::new(&new_blocks, self.func_ctx, self.fn_registry);
