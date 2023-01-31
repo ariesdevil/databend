@@ -335,6 +335,16 @@ impl DataBlock {
         self.meta.as_ref()
     }
 
+    #[inline]
+    pub fn get_belong_to_filename(&self) -> Option<String> {
+        self.belong_to.clone()
+    }
+
+    #[inline]
+    pub fn meta(&self) -> Result<Option<BlockMetaInfoPtr>> {
+        Ok(self.meta.clone())
+    }
+
     pub fn from_arrow_chunk<A: AsRef<dyn Array>>(
         arrow_chunk: &ArrowChunk<A>,
         schema: &DataSchema,

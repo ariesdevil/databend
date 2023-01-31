@@ -59,6 +59,8 @@ pub struct StageTableSink {
 
     single: bool,
     max_file_size: usize,
+
+    skipped_files: Vec<String>,
 }
 
 impl StageTableSink {
@@ -82,6 +84,12 @@ impl StageTableSink {
         let max_file_size = Self::adjust_max_file_size(&ctx, &table_info)?;
         let single = table_info.user_stage_info.copy_options.single;
 
+        let skipped_files = if let Some(ref error_map) = ctx.get_on_error_map() {
+            error_map.keys().cloned().collect()
+        } else {
+            vec![]
+        };
+
         Ok(ProcessorPtr::create(Box::new(StageTableSink {
             input,
             data_accessor,
@@ -98,6 +106,8 @@ impl StageTableSink {
             group_id,
             batch_id: 0,
             max_file_size,
+
+            skipped_files,
         })))
     }
 
@@ -182,9 +192,18 @@ impl Processor for StageTableSink {
                 (Some(output), false) => {
                     if output.can_push() {
                         let block = self.working_datablocks.pop().unwrap();
-                        output.push_data(Ok(block));
+                        match block.get_belong_to_filename() {
+                            Some(path) => {
+                                if !self.skipped_files.contains(&path) {
+                                    output.push_data(Ok(block));
+                                } else {
+                                    output.push_data(Ok(DataBlock::empty()))
+                                }
+                            }
+                            None => output.push_data(Ok(block)),
+                        }
+                        return Ok(Event::NeedConsume);
                     }
-                    return Ok(Event::NeedConsume);
                 }
                 _ => {
                     self.state = State::Finished;
@@ -201,7 +220,17 @@ impl Processor for StageTableSink {
             return Ok(Event::NeedData);
         }
 
-        self.state = State::NeedSerialize(self.input.pull_data().unwrap()?);
+        let block = self.input.pull_data().unwrap()?;
+        match block.get_belong_to_filename() {
+            Some(path) => {
+                if !self.skipped_files.contains(&path) {
+                    self.state = State::NeedSerialize(block);
+                } else {
+                    self.state = State::NeedSerialize(DataBlock::empty())
+                }
+            }
+            None => self.state = State::NeedSerialize(block),
+        }
         Ok(Event::Sync)
     }
 

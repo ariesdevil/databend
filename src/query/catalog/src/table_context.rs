@@ -106,6 +106,7 @@ pub trait TableContext: Send + Sync {
     fn get_cluster(&self) -> Arc<Cluster>;
     fn get_processes_info(&self) -> Vec<ProcessInfo>;
     fn get_stage_attachment(&self) -> Option<StageAttachment>;
+    fn get_on_error_map(&self) -> Option<HashMap<String, ErrorCode>>;
     fn set_on_error_map(&self, map: Option<HashMap<String, ErrorCode>>);
 
     fn apply_changed_settings(&self, changed_settings: Arc<Settings>) -> Result<()>;

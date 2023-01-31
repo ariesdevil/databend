@@ -372,12 +372,20 @@ impl CopyInterpreterV2 {
                 let database_name = database_name.clone();
                 let catalog = catalog.clone();
                 let mut copied_files = BTreeMap::new();
+                let skipped_files = if let Some(error_map) = ctx.get_on_error_map() {
+                    error_map.keys().cloned().collect()
+                } else {
+                    vec![]
+                };
                 for file in &need_copied_files {
                     // Short the etag to 7 bytes for less space in metasrv.
                     let short_etag = file.etag.clone().map(|mut v| {
                         v.truncate(7);
                         v
                     });
+                    if skipped_files.contains(&file.path) {
+                        continue;
+                    }
                     copied_files.insert(file.path.clone(), TableCopiedFileInfo {
                         etag: short_etag,
                         content_length: file.size,

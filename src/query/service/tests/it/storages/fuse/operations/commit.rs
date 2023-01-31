@@ -435,6 +435,10 @@ impl TableContext for CtxDelegation {
         todo!()
     }
 
+    fn get_on_error_map(&self) -> Option<HashMap<String, ErrorCode>> {
+        todo!()
+    }
+
     fn set_on_error_map(&self, _map: Option<HashMap<String, ErrorCode>>) {
         todo!()
     }

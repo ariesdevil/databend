@@ -192,10 +192,6 @@ impl QueryContext {
     pub fn get_created_time(&self) -> SystemTime {
         self.shared.created_time
     }
-
-    pub fn get_on_error_map(&self) -> Option<HashMap<String, ErrorCode>> {
-        self.shared.get_on_error_map()
-    }
 }
 
 #[async_trait::async_trait]
@@ -358,6 +354,10 @@ impl TableContext for QueryContext {
     // Get Stage Attachment.
     fn get_stage_attachment(&self) -> Option<StageAttachment> {
         self.shared.get_stage_attachment()
+    }
+
+    fn get_on_error_map(&self) -> Option<HashMap<String, ErrorCode>> {
+        self.shared.get_on_error_map()
     }
 
     fn set_on_error_map(&self, map: Option<HashMap<String, ErrorCode>>) {
