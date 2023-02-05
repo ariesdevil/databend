@@ -44,12 +44,14 @@ use common_io::prelude::FormatSettings;
 use common_meta_app::principal::RoleInfo;
 use common_meta_app::principal::UserInfo;
 use common_meta_app::schema::TableInfo;
+use common_pipeline_core::InputError;
 use common_settings::Settings;
 use common_storage::DataOperator;
 use common_storage::StorageMetrics;
 use common_storages_fuse::TableContext;
 use common_storages_parquet::ParquetTable;
 use common_storages_stage::StageTable;
+use dashmap::DashMap;
 use parking_lot::RwLock;
 use tracing::debug;
 
@@ -356,12 +358,28 @@ impl TableContext for QueryContext {
         self.shared.get_stage_attachment()
     }
 
-    fn get_on_error_map(&self) -> Option<HashMap<String, ErrorCode>> {
+    fn get_on_error_map(&self) -> Option<Arc<DashMap<String, HashMap<u16, InputError>>>> {
         self.shared.get_on_error_map()
     }
 
-    fn set_on_error_map(&self, map: Option<HashMap<String, ErrorCode>>) {
+    fn set_on_error_map(&self, map: Arc<DashMap<String, HashMap<u16, InputError>>>) {
         self.shared.set_on_error_map(map);
+    }
+
+    fn get_maximum_error_per_file(&self) -> Option<HashMap<String, ErrorCode>> {
+        if let Some(on_error_map) = self.get_on_error_map() {
+            if on_error_map.is_empty() {
+                return None;
+            }
+            let mut m = HashMap::<String, ErrorCode>::new();
+            on_error_map.iter().for_each(|x| {
+                if let Some(max_v) = x.value().iter().max_by_key(|entry| entry.1.num) {
+                    m.insert(x.key().to_string(), max_v.1.err.clone());
+                }
+            });
+            return Some(m);
+        }
+        None
     }
 
     fn apply_changed_settings(&self, changed_settings: Arc<Settings>) -> Result<()> {

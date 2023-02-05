@@ -234,6 +234,7 @@ impl Processor for FuseTableSink {
                 let block_statistics = BlockStatistics::from(
                     &block,
                     block_location.0,
+                    data_block.get_belong_to_filename(),
                     cluster_stats,
                     column_distinct_count,
                     &self.source_schema,
@@ -280,6 +281,7 @@ impl Processor for FuseTableSink {
                 // TODO: dyn operation for table trait
                 let log_entry = AppendOperationLogEntry::new(location, segment);
                 let data_block = DataBlock::try_from(log_entry)?;
+                println!("precommit segment precommit");
                 self.ctx.push_precommit_block(data_block);
             }
             _state => {

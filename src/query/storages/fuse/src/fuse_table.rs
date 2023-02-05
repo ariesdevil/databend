@@ -481,6 +481,12 @@ impl Table for FuseTable {
             .iter()
             .map(AppendOperationLogEntry::try_from)
             .collect::<Result<Vec<AppendOperationLogEntry>>>()?;
+        for a in &append_log_entries {
+            let blks = a.segment_info.blocks.clone();
+            for b in blks {
+                println!("commit block: {:?}", b.belong_to);
+            }
+        }
         self.do_commit(ctx, append_log_entries, overwrite).await
     }
 

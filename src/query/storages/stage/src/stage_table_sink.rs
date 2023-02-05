@@ -84,7 +84,7 @@ impl StageTableSink {
         let max_file_size = Self::adjust_max_file_size(&ctx, &table_info)?;
         let single = table_info.user_stage_info.copy_options.single;
 
-        let skipped_files = if let Some(ref error_map) = ctx.get_on_error_map() {
+        let skipped_files = if let Some(error_map) = ctx.get_maximum_error_per_file() {
             error_map.keys().cloned().collect()
         } else {
             vec![]

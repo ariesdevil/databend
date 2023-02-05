@@ -26,6 +26,7 @@ pub struct BlockStatistics {
     pub block_rows_size: u64,
     pub block_bytes_size: u64,
     pub block_file_location: String,
+    pub block_belong_to: Option<String>,
     pub block_column_statistics: HashMap<ColumnId, ColumnStatistics>,
     pub block_cluster_statistics: Option<ClusterStatistics>,
 }
@@ -34,12 +35,14 @@ impl BlockStatistics {
     pub fn from(
         data_block: &DataBlock,
         location: String,
+        belong_to: Option<String>,
         cluster_stats: Option<ClusterStatistics>,
         column_distinct_count: Option<HashMap<usize, usize>>,
         schema: &TableSchemaRef,
     ) -> common_exception::Result<BlockStatistics> {
         Ok(BlockStatistics {
             block_file_location: location,
+            block_belong_to: belong_to,
             block_rows_size: data_block.num_rows() as u64,
             block_bytes_size: data_block.memory_size() as u64,
             block_column_statistics: column_statistic::gen_columns_statistics(

@@ -30,6 +30,7 @@ use common_formats::FieldDecoder;
 use common_formats::FileFormatOptionsExt;
 use common_meta_app::principal::StageFileFormatType;
 use common_meta_app::principal::UserStageInfo;
+use common_pipeline_core::InputError;
 use common_pipeline_core::Pipeline;
 use common_settings::Settings;
 use opendal::raw::DecompressDecoder;
@@ -44,7 +45,6 @@ use crate::input_formats::input_split::FileInfo;
 use crate::input_formats::split_by_size;
 use crate::input_formats::BeyondEndReader;
 use crate::input_formats::InputContext;
-use crate::input_formats::InputError;
 use crate::input_formats::InputFormat;
 use crate::input_formats::SplitInfo;
 
@@ -285,6 +285,7 @@ pub trait InputFormatTextBase: Sized + Send + Sync + 'static {
         });
 
         if skipfile_num <= 1 || error_count.fetch_add(1, Ordering::Relaxed) >= skipfile_num - 1 {
+            println!("enter insert to error map");
             error_map
                 .entry(e.code())
                 .and_modify(|input_error| input_error.num += 1)
@@ -476,11 +477,13 @@ pub struct BlockBuilder<T> {
     pub ctx: Arc<InputContext>,
     pub mutable_columns: Vec<TypeDeserializerImpl>,
     pub num_rows: usize,
+    current_filename: String,
     phantom: PhantomData<T>,
 }
 
 impl<T: InputFormatTextBase> BlockBuilder<T> {
     fn flush(&mut self, file_name: String) -> Result<Vec<DataBlock>> {
+        println!("flush filename: {file_name}");
         let columns: Vec<Column> = self
             .mutable_columns
             .iter_mut()
@@ -507,7 +510,8 @@ impl<T: InputFormatTextBase> BlockBuilder<T> {
     }
 
     fn merge_map(&self, error_map: HashMap<u16, InputError>, file_name: String) {
-        if let Some(ref on_error_map) = self.ctx.on_error_map {
+        if let Some(on_error_map) = self.ctx.on_error_map.clone() {
+            println!("enter merge map");
             on_error_map
                 .entry(file_name)
                 .and_modify(|x| {
@@ -534,16 +538,18 @@ impl<T: InputFormatTextBase> BlockBuilderTrait for BlockBuilder<T> {
             mutable_columns: columns,
             num_rows: 0,
             field_decoder,
+            current_filename: "".to_string(),
             phantom: PhantomData,
         }
     }
 
     fn deserialize(&mut self, batch: Option<RowBatch>) -> Result<Vec<DataBlock>> {
         if let Some(b) = batch {
-            let file_name = b.split_info.file.path.clone();
+            println!("enter rowbatch");
+            self.current_filename = b.split_info.file.path.clone();
             self.num_rows += b.row_ends.len();
             let r = T::deserialize(self, b)?;
-            self.merge_map(r, file_name.clone());
+            self.merge_map(r, self.current_filename.clone());
             let mem = self.memory_size();
             tracing::debug!(
                 "chunk builder added new batch: row {} size {}",
@@ -553,12 +559,12 @@ impl<T: InputFormatTextBase> BlockBuilderTrait for BlockBuilder<T> {
             if self.num_rows >= self.ctx.block_compact_thresholds.min_rows_per_block
                 || mem > self.ctx.block_compact_thresholds.max_bytes_per_block
             {
-                self.flush(file_name)
+                self.flush(self.current_filename.clone())
             } else {
                 Ok(vec![])
             }
         } else {
-            self.flush("".to_string())
+            self.flush(self.current_filename.clone())
         }
     }
 }

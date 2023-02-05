@@ -42,6 +42,7 @@ use common_expression::TableSchema;
 use common_expression::TableSchemaRef;
 use common_meta_app::principal::OnErrorMode;
 use common_meta_app::principal::UserStageInfo;
+use common_pipeline_core::InputError;
 use common_pipeline_core::Pipeline;
 use common_settings::Settings;
 use futures::AsyncRead;
@@ -59,7 +60,6 @@ use crate::input_formats::input_pipeline::RowBatchTrait;
 use crate::input_formats::input_split::DynData;
 use crate::input_formats::input_split::FileInfo;
 use crate::input_formats::InputContext;
-use crate::input_formats::InputError;
 use crate::input_formats::InputFormat;
 use crate::input_formats::SplitInfo;
 

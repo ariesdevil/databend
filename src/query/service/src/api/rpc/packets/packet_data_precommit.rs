@@ -35,6 +35,7 @@ pub struct PrecommitBlock(pub DataBlock);
 
 impl PrecommitBlock {
     pub fn precommit(&self, ctx: &Arc<QueryContext>) {
+        println!("precommit block precommit");
         ctx.push_precommit_block(self.0.clone());
     }
 

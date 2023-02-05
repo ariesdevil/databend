@@ -32,6 +32,7 @@ use common_io::cursor_ext::*;
 use common_io::format_diagnostic::verbose_char;
 use common_meta_app::principal::OnErrorMode;
 use common_meta_app::principal::StageFileFormatType;
+use common_pipeline_core::InputError;
 use csv_core::ReadRecordResult;
 
 use crate::input_formats::impls::input_format_tsv::format_column_error;
@@ -39,7 +40,6 @@ use crate::input_formats::AligningStateCommon;
 use crate::input_formats::AligningStateTextBased;
 use crate::input_formats::BlockBuilder;
 use crate::input_formats::InputContext;
-use crate::input_formats::InputError;
 use crate::input_formats::InputFormatTextBase;
 use crate::input_formats::RowBatch;
 use crate::input_formats::SplitInfo;
@@ -141,6 +141,7 @@ impl InputFormatTextBase for InputFormatCSV {
                     }
 
                     OnErrorMode::SkipFileNum(n) => {
+                        println!("enter csv skip file");
                         Self::on_error_skipfile(
                             columns,
                             num_rows,

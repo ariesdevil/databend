@@ -681,7 +681,7 @@ impl CompactSegmentTestFixture {
                 let col_stats = gen_columns_statistics(&block, None, &schema)?;
 
                 let mut block_statistics =
-                    BlockStatistics::from(&block, "".to_owned(), None, None, &schema)?;
+                    BlockStatistics::from(&block, "".to_owned(), None, None, None, &schema)?;
                 let block_meta = block_writer
                     .write(FuseStorageFormat::Parquet, &schema, block, col_stats, None)
                     .await?;

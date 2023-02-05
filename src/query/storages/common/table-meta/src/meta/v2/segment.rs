@@ -59,6 +59,8 @@ pub struct BlockMeta {
     #[serde(default)]
     pub bloom_filter_index_size: u64,
     pub compression: Compression,
+
+    pub belong_to: Option<String>,
 }
 
 impl BlockMeta {
@@ -74,6 +76,7 @@ impl BlockMeta {
         bloom_filter_index_location: Option<Location>,
         bloom_filter_index_size: u64,
         compression: Compression,
+        belong_to: Option<String>,
     ) -> Self {
         Self {
             row_count,
@@ -86,6 +89,7 @@ impl BlockMeta {
             bloom_filter_index_location,
             bloom_filter_index_size,
             compression,
+            belong_to,
         }
     }
 
@@ -194,6 +198,7 @@ impl BlockMeta {
             bloom_filter_index_location: None,
             bloom_filter_index_size: 0,
             compression: Compression::Lz4,
+            belong_to: None,
         }
     }
 
@@ -224,6 +229,7 @@ impl BlockMeta {
             bloom_filter_index_location: s.bloom_filter_index_location.clone(),
             bloom_filter_index_size: s.bloom_filter_index_size,
             compression: s.compression,
+            belong_to: None,
         }
     }
 }

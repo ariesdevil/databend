@@ -115,6 +115,7 @@ impl<I: InputFormatPipe> Processor for Aligner<I> {
     }
 
     fn process(&mut self) -> Result<()> {
+        println!("enter source aligner process");
         match &mut self.state {
             Some(state) => {
                 let mut process_values = ProgressValues { rows: 0, bytes: 0 };
@@ -151,6 +152,7 @@ impl<I: InputFormatPipe> Processor for Aligner<I> {
     }
 
     async fn async_process(&mut self) -> Result<()> {
+        println!("enter source aligner async process");
         if !self.no_more_split {
             match &self.state {
                 None => match self.split_rx.recv().await {

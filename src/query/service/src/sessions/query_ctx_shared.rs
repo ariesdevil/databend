@@ -29,9 +29,11 @@ use common_exception::Result;
 use common_expression::DataBlock;
 use common_meta_app::principal::RoleInfo;
 use common_meta_app::principal::UserInfo;
+use common_pipeline_core::InputError;
 use common_settings::Settings;
 use common_storage::DataOperator;
 use common_storage::StorageMetrics;
+use dashmap::DashMap;
 use parking_lot::Mutex;
 use parking_lot::RwLock;
 use uuid::Uuid;
@@ -79,7 +81,8 @@ pub struct QueryContextShared {
     pub(in crate::sessions) precommit_blocks: Arc<RwLock<Vec<DataBlock>>>,
     pub(in crate::sessions) stage_attachment: Arc<RwLock<Option<StageAttachment>>>,
     pub(in crate::sessions) created_time: SystemTime,
-    pub(in crate::sessions) on_error_map: Arc<RwLock<Option<HashMap<String, ErrorCode>>>>,
+    pub(in crate::sessions) on_error_map:
+        Arc<RwLock<Option<Arc<DashMap<String, HashMap<u16, InputError>>>>>>,
 }
 
 impl QueryContextShared {
@@ -118,12 +121,12 @@ impl QueryContextShared {
         *guard = Some(err);
     }
 
-    pub fn set_on_error_map(&self, map: Option<HashMap<String, ErrorCode>>) {
+    pub fn set_on_error_map(&self, map: Arc<DashMap<String, HashMap<u16, InputError>>>) {
         let mut guard = self.on_error_map.write();
-        *guard = map;
+        *guard = Some(map);
     }
 
-    pub fn get_on_error_map(&self) -> Option<HashMap<String, ErrorCode>> {
+    pub fn get_on_error_map(&self) -> Option<Arc<DashMap<String, HashMap<u16, InputError>>>> {
         self.on_error_map.read().as_ref().cloned()
     }
 

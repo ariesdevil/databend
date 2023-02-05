@@ -372,11 +372,12 @@ impl CopyInterpreterV2 {
                 let database_name = database_name.clone();
                 let catalog = catalog.clone();
                 let mut copied_files = BTreeMap::new();
-                let skipped_files = if let Some(error_map) = ctx.get_on_error_map() {
+                let skipped_files = if let Some(error_map) = ctx.get_maximum_error_per_file() {
                     error_map.keys().cloned().collect()
                 } else {
                     vec![]
                 };
+                println!("finish pipeline skipped files: {:?}", skipped_files);
                 for file in &need_copied_files {
                     // Short the etag to 7 bytes for less space in metasrv.
                     let short_etag = file.etag.clone().map(|mut v| {
@@ -393,9 +394,20 @@ impl CopyInterpreterV2 {
                     });
                 }
 
+                println!(
+                    "finish pipeline copied files: {:?}",
+                    copied_files.keys().cloned().collect::<String>()
+                );
+
                 return GlobalIORuntime::instance().block_on(async move {
                     // 1. Commit data.
                     let operations = ctx.consume_precommit_blocks();
+                    for db in &operations {
+                        println!(
+                            "finish pipeline datablock: {:?}",
+                            db.get_belong_to_filename()
+                        );
+                    }
                     info!(
                         "copy: try to commit operations:{}, elapsed:{}",
                         operations.len(),
@@ -440,7 +452,7 @@ impl CopyInterpreterV2 {
 
                     // 4. log on_error mode errors.
                     // todo(ariesdevil): persist errors with query_id
-                    if let Some(error_map) = ctx.get_on_error_map() {
+                    if let Some(error_map) = ctx.get_maximum_error_per_file() {
                         for (file_name, e) in error_map {
                             error!(
                                 "copy(on_error={}): file {} encounter error {},",

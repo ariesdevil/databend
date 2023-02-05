@@ -34,6 +34,7 @@ use common_meta_app::principal::OnErrorMode;
 use common_meta_app::principal::StageFileCompression;
 use common_meta_app::principal::StageFileFormatType;
 use common_meta_app::principal::UserStageInfo;
+use common_pipeline_core::InputError;
 use common_settings::Settings;
 use dashmap::DashMap;
 use opendal::raw::CompressAlgorithm;
@@ -44,7 +45,6 @@ use crate::input_formats::impls::InputFormatNDJson;
 use crate::input_formats::impls::InputFormatParquet;
 use crate::input_formats::impls::InputFormatTSV;
 use crate::input_formats::impls::InputFormatXML;
-use crate::input_formats::InputError;
 use crate::input_formats::InputFormat;
 use crate::input_formats::SplitInfo;
 use crate::input_formats::StreamingReadBatch;
@@ -123,7 +123,7 @@ pub struct InputContext {
     pub scan_progress: Arc<Progress>,
     pub on_error_mode: OnErrorMode,
     pub on_error_count: AtomicU64,
-    pub on_error_map: Option<DashMap<String, HashMap<u16, InputError>>>,
+    pub on_error_map: Option<Arc<DashMap<String, HashMap<u16, InputError>>>>,
 }
 
 impl Debug for InputContext {
@@ -160,6 +160,7 @@ impl InputContext {
         splits: Vec<Arc<SplitInfo>>,
         scan_progress: Arc<Progress>,
         block_compact_thresholds: BlockThresholds,
+        on_error_map: Arc<DashMap<String, HashMap<u16, InputError>>>,
     ) -> Result<Self> {
         let on_error_mode = stage_info.copy_options.on_error.clone();
         let plan = Box::new(CopyIntoPlan { stage_info });
@@ -187,7 +188,7 @@ impl InputContext {
             format_options: file_format_options,
             on_error_mode,
             on_error_count: AtomicU64::new(0),
-            on_error_map: Some(DashMap::new()),
+            on_error_map: Some(on_error_map),
         })
     }
 
@@ -351,22 +352,6 @@ impl InputContext {
             self.schema.fields()
         );
         ErrorCode::BadBytes(msg)
-    }
-
-    pub fn get_maximum_error_per_file(&self) -> Option<HashMap<String, ErrorCode>> {
-        if let Some(ref on_error_map) = self.on_error_map {
-            if on_error_map.is_empty() {
-                return None;
-            }
-            let mut m = HashMap::<String, ErrorCode>::new();
-            on_error_map.iter().for_each(|x| {
-                if let Some(max_v) = x.value().iter().max_by_key(|entry| entry.1.num) {
-                    m.insert(x.key().to_string(), max_v.1.err.clone());
-                }
-            });
-            return Some(m);
-        }
-        None
     }
 }
 

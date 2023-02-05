@@ -116,6 +116,7 @@ impl StatisticsAccumulator {
         let col_stats = block_statistics.block_column_statistics.clone();
         let data_location = (block_statistics.block_file_location, DataBlock::VERSION);
         let cluster_stats = block_statistics.block_cluster_statistics;
+        let belong_to = block_statistics.block_belong_to;
 
         if self
             .thresholds
@@ -135,6 +136,7 @@ impl StatisticsAccumulator {
             bloom_filter_index_location,
             bloom_filter_index_size,
             block_compression,
+            belong_to,
         )));
 
         Ok(())

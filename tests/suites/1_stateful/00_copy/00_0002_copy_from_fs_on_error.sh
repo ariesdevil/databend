@@ -55,6 +55,13 @@ echo "$WRONG_CSV" | $MYSQL_CLIENT_CONNECT 2>&1 | grep -c "bad field end"
 echo "select count(1) from wrong_csv" | $MYSQL_CLIENT_CONNECT
 echo "truncate table wrong_csv" | $MYSQL_CLIENT_CONNECT
 
+# copy wrong files on_error=skip_file_n
+WRONG_CSV="COPY INTO wrong_csv FROM 'fs://${DATADIR}/wrong_sample.csv' FILE_FORMAT = (type = CSV field_delimiter = ','  record_delimiter = '\n' skip_header = 0) ON_ERROR=skip_file"
+
+echo "$WRONG_CSV" | $MYSQL_CLIENT_CONNECT
+echo "select count(1) from wrong_csv" | $MYSQL_CLIENT_CONNECT
+echo "truncate table wrong_csv" | $MYSQL_CLIENT_CONNECT
+
 ## Drop table
 echo "drop table if exists wrong_csv;" | $MYSQL_CLIENT_CONNECT
 echo "drop table if exists wrong_ndjson" | $MYSQL_CLIENT_CONNECT

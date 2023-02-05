@@ -185,6 +185,8 @@ impl Processor for SerializeDataTransform {
                 let col_stats =
                     gen_columns_statistics(&block, column_distinct_count, &self.schema)?;
 
+                let belong_to = block.get_belong_to_filename();
+
                 // serialize data block.
                 let mut block_data = Vec::with_capacity(DEFAULT_BLOCK_BUFFER_SIZE);
                 let schema = self.schema.clone();
@@ -219,6 +221,7 @@ impl Processor for SerializeDataTransform {
                     index_location.clone(),
                     index_size,
                     self.table_compression.into(),
+                    belong_to,
                 ));
 
                 self.state = State::Serialized(

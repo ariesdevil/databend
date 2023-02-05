@@ -28,9 +28,11 @@ use common_expression::FunctionContext;
 use common_io::prelude::FormatSettings;
 use common_meta_app::principal::RoleInfo;
 use common_meta_app::principal::UserInfo;
+use common_pipeline_core::InputError;
 use common_settings::Settings;
 use common_storage::DataOperator;
 use common_storage::StorageMetrics;
+use dashmap::DashMap;
 
 use crate::catalog::Catalog;
 use crate::cluster_info::Cluster;
@@ -106,8 +108,10 @@ pub trait TableContext: Send + Sync {
     fn get_cluster(&self) -> Arc<Cluster>;
     fn get_processes_info(&self) -> Vec<ProcessInfo>;
     fn get_stage_attachment(&self) -> Option<StageAttachment>;
-    fn get_on_error_map(&self) -> Option<HashMap<String, ErrorCode>>;
-    fn set_on_error_map(&self, map: Option<HashMap<String, ErrorCode>>);
+    fn get_on_error_map(&self) -> Option<Arc<DashMap<String, HashMap<u16, InputError>>>>;
+    fn set_on_error_map(&self, map: Arc<DashMap<String, HashMap<u16, InputError>>>);
+
+    fn get_maximum_error_per_file(&self) -> Option<HashMap<String, ErrorCode>>;
 
     fn apply_changed_settings(&self, changed_settings: Arc<Settings>) -> Result<()>;
     fn get_changed_settings(&self) -> Arc<Settings>;

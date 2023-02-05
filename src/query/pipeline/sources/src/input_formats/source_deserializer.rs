@@ -99,6 +99,7 @@ impl<I: InputFormatPipe> Processor for DeserializeSource<I> {
     }
 
     fn process(&mut self) -> Result<()> {
+        println!("enter source process");
         if self.input_finished {
             assert!(self.input_buffer.is_none());
         }
@@ -109,6 +110,10 @@ impl<I: InputFormatPipe> Processor for DeserializeSource<I> {
             };
             self.ctx.scan_progress.incr(&process_values)
         }
+        println!(
+            "input buffer len:{}",
+            self.input_buffer.as_ref().unwrap().size()
+        );
         let blocks = self.block_builder.deserialize(self.input_buffer.take())?;
         for b in blocks.into_iter() {
             self.output_buffer.push_back(b)
@@ -117,9 +122,11 @@ impl<I: InputFormatPipe> Processor for DeserializeSource<I> {
     }
 
     async fn async_process(&mut self) -> Result<()> {
+        println!("enter source async process");
         assert!(self.input_buffer.is_none() && !self.input_finished);
         match self.input_rx.recv().await {
             Ok(row_batch) => {
+                println!("enter input rx recv");
                 self.input_buffer = Some(row_batch?);
             }
             Err(_) => {
