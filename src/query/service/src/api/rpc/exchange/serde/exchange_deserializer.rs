@@ -92,7 +92,12 @@ impl TransformExchangeDeserializer {
         if block.num_columns() == 0 {
             let mut row_count_meta = &fragment_data.get_meta()[..ROW_HEADER_SIZE];
             let row_count: u32 = row_count_meta.read_scalar()?;
-            return Ok(DataBlock::new_with_meta(vec![], row_count as usize, meta));
+            return Ok(DataBlock::new_with_meta(
+                vec![],
+                row_count as usize,
+                None,
+                meta,
+            ));
         }
 
         block.add_meta(meta)
