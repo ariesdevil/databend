@@ -163,10 +163,10 @@ pub trait InputFormatPipe: Sized + Send + 'static {
             for s in &ctx_clone.splits {
                 let (data_tx, data_rx) = tokio::sync::mpsc::channel(ctx.num_prefetch_per_split());
                 let split_clone = s.clone();
-                let ctx_clone2 = ctx_clone.clone();
+                let input_ctx_clone = ctx_clone.clone();
                 tokio::spawn(async move {
                     if let Err(e) =
-                        Self::copy_reader_with_aligner(ctx_clone2, split_clone, data_tx).await
+                        Self::copy_reader_with_aligner(input_ctx_clone, split_clone, data_tx).await
                     {
                         tracing::error!("copy split reader error: {:?}", e);
                     } else {

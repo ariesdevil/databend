@@ -110,6 +110,7 @@ pub trait TableContext: Send + Sync {
     fn get_stage_attachment(&self) -> Option<StageAttachment>;
     fn get_on_error_map(&self) -> Option<Arc<DashMap<String, HashMap<u16, InputError>>>>;
     fn set_on_error_map(&self, map: Arc<DashMap<String, HashMap<u16, InputError>>>);
+    fn get_skipfile_count(&self) -> Arc<DashMap<String, usize>>;
 
     fn get_maximum_error_per_file(&self) -> Option<HashMap<String, ErrorCode>>;
 

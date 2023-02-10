@@ -67,11 +67,13 @@ use common_meta_app::schema::UpsertTableCopiedFileReq;
 use common_meta_app::schema::UpsertTableOptionReply;
 use common_meta_app::schema::UpsertTableOptionReq;
 use common_meta_types::MetaId;
+use common_pipeline_core::InputError;
 use common_settings::Settings;
 use common_storage::DataOperator;
 use common_storages_fuse::operations::AppendOperationLogEntry;
 use common_storages_fuse::FuseTable;
 use common_storages_fuse::FUSE_TBL_SNAPSHOT_PREFIX;
+use dashmap::DashMap;
 use databend_query::sessions::QueryContext;
 use futures::TryStreamExt;
 use storages_common_table_meta::meta::SegmentInfo;
@@ -435,12 +437,16 @@ impl TableContext for CtxDelegation {
         todo!()
     }
 
-    fn get_on_error_map(&self) -> Option<Arc<HashMap<String, ErrorCode>>> {
+    fn get_on_error_map(&self) -> Option<Arc<DashMap<String, HashMap<u16, InputError>>>> {
         todo!()
     }
 
-    fn set_on_error_map(&self, _map: Arc<HashMap<String, ErrorCode>>) {
+    fn set_on_error_map(&self, map: Arc<DashMap<String, HashMap<u16, InputError>>>) {
         todo!()
+    }
+
+    fn get_skipfile_count(&self) -> Arc<DashMap<String, usize>> {
+        todo!();
     }
 
     fn get_maximum_error_per_file(&self) -> Option<HashMap<String, ErrorCode>> {

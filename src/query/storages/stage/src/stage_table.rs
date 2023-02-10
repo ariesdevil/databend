@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use std::any::Any;
+use std::collections::BTreeMap;
 use std::ops::Deref;
 use std::path::Path;
 use std::sync::atomic::AtomicUsize;
@@ -159,6 +160,15 @@ impl Table for StageTable {
                 &ctx.get_settings(),
             )
             .await?;
+
+        let tmp = splits.iter().fold(BTreeMap::new(), |mut acc, v| {
+            acc.entry(v.file.path.clone())
+                .and_modify(|count| *count += 1)
+                .or_insert(1);
+            acc
+        });
+
+        println!("file stats: {:?}", tmp);
 
         let partitions = splits
             .into_iter()

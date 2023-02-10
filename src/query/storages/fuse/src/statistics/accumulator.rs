@@ -23,14 +23,29 @@ use storages_common_table_meta::meta;
 use storages_common_table_meta::meta::BlockMeta;
 use storages_common_table_meta::meta::ColumnMeta;
 use storages_common_table_meta::meta::Location;
+use storages_common_table_meta::meta::Statistics;
 use storages_common_table_meta::meta::StatisticsOfColumns;
 use storages_common_table_meta::meta::Versioned;
 
 use crate::statistics::block_statistics::BlockStatistics;
 
+#[derive(Default, Clone)]
+pub struct BlockMetaStats {
+    pub block_metas: Vec<Arc<BlockMeta>>,
+    pub stats: Statistics,
+    pub blocks_statistics: Vec<StatisticsOfColumns>,
+}
+
+impl BlockMetaStats {
+    pub fn summary(&self) -> Result<StatisticsOfColumns> {
+        super::reduce_block_statistics(&self.blocks_statistics, None)
+    }
+}
+
 #[derive(Default)]
 pub struct StatisticsAccumulator {
     pub blocks_metas: Vec<Arc<BlockMeta>>,
+    pub block_meta_map: HashMap<String, BlockMetaStats>,
     pub blocks_statistics: Vec<StatisticsOfColumns>,
     pub summary_row_count: u64,
     pub summary_block_count: u64,
@@ -58,6 +73,7 @@ impl StatisticsAccumulator {
         bloom_filter_index_location: Option<Location>,
         bloom_filter_index_size: u64,
         block_compression: meta::Compression,
+        mode: String,
     ) -> Result<()> {
         self.add(
             file_size,
@@ -66,6 +82,7 @@ impl StatisticsAccumulator {
             bloom_filter_index_location,
             bloom_filter_index_size,
             block_compression,
+            mode,
         )
     }
 
@@ -87,6 +104,7 @@ impl StatisticsAccumulator {
             bloom_filter_index_location,
             bloom_filter_index_size,
             block_compression,
+            "skipfile".to_string(),
         )
     }
 
@@ -102,7 +120,15 @@ impl StatisticsAccumulator {
         bloom_filter_index_location: Option<Location>,
         bloom_filter_index_size: u64,
         block_compression: meta::Compression,
+        mode: String,
     ) -> Result<()> {
+        // row_count: acc.summary_row_count,
+        // block_count: acc.summary_block_count,
+        // perfect_block_count: acc.perfect_block_count,
+        // uncompressed_byte_size: acc.in_memory_size,
+        // compressed_byte_size: acc.file_size,
+        // index_size: acc.index_size,
+        // col_stats,
         self.file_size += file_size;
         self.index_size += bloom_filter_index_size;
         self.summary_block_count += 1;
@@ -125,19 +151,75 @@ impl StatisticsAccumulator {
             self.perfect_block_count += 1;
         }
 
-        self.blocks_metas.push(Arc::new(BlockMeta::new(
-            row_count,
-            block_size,
-            file_size,
-            col_stats,
-            column_meta,
-            cluster_stats,
-            data_location,
-            bloom_filter_index_location,
-            bloom_filter_index_size,
-            block_compression,
-            belong_to,
-        )));
+        if mode == "skipfile".to_string() {
+            let block_meta = Arc::new(BlockMeta::new(
+                row_count,
+                block_size,
+                file_size,
+                col_stats,
+                column_meta,
+                cluster_stats,
+                data_location,
+                bloom_filter_index_location,
+                bloom_filter_index_size,
+                block_compression,
+                belong_to.clone(),
+            ));
+
+            self.block_meta_map
+                .entry(belong_to.unwrap())
+                .and_modify(|block_metas| {
+                    block_metas.block_metas.push(block_meta.clone());
+                    block_metas.stats.row_count += row_count;
+                    block_metas.stats.block_count += 1;
+                    if self
+                        .thresholds
+                        .check_large_enough(row_count as usize, block_size as usize)
+                    {
+                        block_metas.stats.perfect_block_count += 1;
+                    }
+                    block_metas.stats.index_size += bloom_filter_index_size;
+                    block_metas.stats.compressed_byte_size += file_size;
+                    block_metas.stats.uncompressed_byte_size += block_statistics.block_bytes_size;
+                    block_metas
+                        .blocks_statistics
+                        .push(block_statistics.block_column_statistics.clone());
+                })
+                .or_insert({
+                    let mut block_metas = BlockMetaStats::default();
+                    block_metas.block_metas.push(block_meta);
+                    block_metas.stats.row_count += row_count;
+                    block_metas.stats.block_count += 1;
+                    if self
+                        .thresholds
+                        .check_large_enough(row_count as usize, block_size as usize)
+                    {
+                        block_metas.stats.perfect_block_count += 1;
+                    }
+                    block_metas.stats.index_size += bloom_filter_index_size;
+                    block_metas.stats.compressed_byte_size += file_size;
+                    block_metas.stats.uncompressed_byte_size += block_statistics.block_bytes_size;
+                    block_metas
+                        .blocks_statistics
+                        .push(block_statistics.block_column_statistics.clone());
+
+                    block_metas
+                });
+        } else {
+            self.blocks_metas.push(Arc::new(BlockMeta::new(
+                row_count,
+                block_size,
+                file_size,
+                col_stats,
+                column_meta,
+                cluster_stats,
+                data_location,
+                bloom_filter_index_location,
+                bloom_filter_index_size,
+                block_compression,
+                belong_to,
+            )));
+        }
 
         Ok(())
     }

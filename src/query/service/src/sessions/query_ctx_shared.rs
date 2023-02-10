@@ -83,6 +83,7 @@ pub struct QueryContextShared {
     pub(in crate::sessions) created_time: SystemTime,
     pub(in crate::sessions) on_error_map:
         Arc<RwLock<Option<Arc<DashMap<String, HashMap<u16, InputError>>>>>>,
+    pub(in crate::sessions) skipfile_count: Arc<DashMap<String, usize>>,
 }
 
 impl QueryContextShared {
@@ -113,6 +114,7 @@ impl QueryContextShared {
             stage_attachment: Arc::new(RwLock::new(None)),
             created_time: SystemTime::now(),
             on_error_map: Arc::new(RwLock::new(None)),
+            skipfile_count: Arc::new(DashMap::new()),
         }))
     }
 
@@ -128,6 +130,10 @@ impl QueryContextShared {
 
     pub fn get_on_error_map(&self) -> Option<Arc<DashMap<String, HashMap<u16, InputError>>>> {
         self.on_error_map.read().as_ref().cloned()
+    }
+
+    pub fn get_skipfile_count(&self) -> Arc<DashMap<String, usize>> {
+        self.skipfile_count.clone()
     }
 
     pub fn kill(&self, cause: ErrorCode) {

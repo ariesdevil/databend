@@ -83,6 +83,7 @@ pub struct LoaderWrapper<T>(T);
 #[async_trait::async_trait]
 impl Loader<TableSnapshot> for LoaderWrapper<Operator> {
     async fn load(&self, params: &LoadParams) -> Result<TableSnapshot> {
+        // todo here.
         let reader = bytes_reader(&self.0, params.location.as_str(), params.len_hint).await?;
         let version = SnapshotVersion::try_from(params.ver)?;
         version.read(reader).await
@@ -133,6 +134,7 @@ async fn bytes_reader(op: &Operator, path: &str, len: Option<u64>) -> Result<Obj
     let len = match len {
         Some(l) => l,
         None => {
+            // toto here.
             // TODO why do we need the content length (extra HEAD http req)? here we just need to read ALL the content
             let meta = object.metadata().await?;
             meta.content_length()

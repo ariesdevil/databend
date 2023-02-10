@@ -47,7 +47,7 @@ impl TryFrom<AppendOperationLogEntry> for DataBlock {
         Ok(DataBlock::new_with_meta(
             vec![],
             0,
-            None,
+            value.segment_info.file_name(),
             Some(Box::new(value)),
         ))
     }

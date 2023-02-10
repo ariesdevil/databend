@@ -111,7 +111,7 @@ enum State {
         block_statistics: BlockStatistics,
         bloom_index_state: Option<BloomIndexState>,
     },
-    GenerateSegment,
+    GenerateSegment(Option<String>),
     SerializedSegment {
         data: Vec<u8>,
         location: String,
@@ -125,6 +125,7 @@ enum State {
 }
 
 pub struct FuseTableSink {
+    mode: String,
     state: State,
     input: Arc<InputPort>,
     ctx: Arc<dyn TableContext>,
@@ -153,6 +154,7 @@ impl FuseTableSink {
         output: Option<Arc<OutputPort>>,
     ) -> Result<ProcessorPtr> {
         Ok(ProcessorPtr::create(Box::new(FuseTableSink {
+            mode: "skipfile".to_string(),
             ctx,
             input,
             data_accessor,
@@ -180,7 +182,7 @@ impl Processor for FuseTableSink {
     fn event(&mut self) -> Result<Event> {
         if matches!(
             &self.state,
-            State::NeedSerialize(_) | State::GenerateSegment | State::PreCommitSegment { .. }
+            State::NeedSerialize(_) | State::GenerateSegment(_) | State::PreCommitSegment { .. }
         ) {
             return Ok(Event::Sync);
         }
@@ -193,9 +195,17 @@ impl Processor for FuseTableSink {
         }
 
         if self.input.is_finished() {
-            if self.accumulator.summary_row_count != 0 {
-                self.state = State::GenerateSegment;
-                return Ok(Event::Sync);
+            if self.mode.eq_ignore_ascii_case("skipfile") {
+                let key = self.accumulator.block_meta_map.keys().next().cloned();
+                if let Some(key) = key {
+                    self.state = State::GenerateSegment(Some(key));
+                    return Ok(Event::Sync);
+                }
+            } else {
+                if self.accumulator.summary_row_count != 0 {
+                    self.state = State::GenerateSegment(None);
+                    return Ok(Event::Sync);
+                }
             }
             if let Some(output) = &self.output {
                 output.finish();
@@ -253,24 +263,46 @@ impl Processor for FuseTableSink {
                     bloom_index_state,
                 };
             }
-            State::GenerateSegment => {
-                let acc = std::mem::take(&mut self.accumulator);
-                let col_stats = acc.summary()?;
+            State::GenerateSegment(file) => {
+                if let Some(file) = file {
+                    let block_metas = self.accumulator.block_meta_map.remove(&file).unwrap();
+                    let col_stats = block_metas.summary()?;
+                    let segment_info = SegmentInfo::new_with_filename(
+                        block_metas.block_metas,
+                        Statistics {
+                            row_count: block_metas.stats.row_count,
+                            block_count: block_metas.stats.block_count,
+                            perfect_block_count: block_metas.stats.perfect_block_count,
+                            uncompressed_byte_size: block_metas.stats.uncompressed_byte_size,
+                            compressed_byte_size: block_metas.stats.compressed_byte_size,
+                            index_size: block_metas.stats.index_size,
+                            col_stats,
+                        },
+                        Some(file),
+                    );
+                    self.state = State::SerializedSegment {
+                        data: serde_json::to_vec(&segment_info)?,
+                        location: self.meta_locations.gen_segment_info_location(),
+                        segment: Arc::new(segment_info),
+                    }
+                } else {
+                    let acc = std::mem::take(&mut self.accumulator);
+                    let col_stats = acc.summary()?;
+                    let segment_info = SegmentInfo::new(acc.blocks_metas, Statistics {
+                        row_count: acc.summary_row_count,
+                        block_count: acc.summary_block_count,
+                        perfect_block_count: acc.perfect_block_count,
+                        uncompressed_byte_size: acc.in_memory_size,
+                        compressed_byte_size: acc.file_size,
+                        index_size: acc.index_size,
+                        col_stats,
+                    });
 
-                let segment_info = SegmentInfo::new(acc.blocks_metas, Statistics {
-                    row_count: acc.summary_row_count,
-                    block_count: acc.summary_block_count,
-                    perfect_block_count: acc.perfect_block_count,
-                    uncompressed_byte_size: acc.in_memory_size,
-                    compressed_byte_size: acc.file_size,
-                    index_size: acc.index_size,
-                    col_stats,
-                });
-
-                self.state = State::SerializedSegment {
-                    data: serde_json::to_vec(&segment_info)?,
-                    location: self.meta_locations.gen_segment_info_location(),
-                    segment: Arc::new(segment_info),
+                    self.state = State::SerializedSegment {
+                        data: serde_json::to_vec(&segment_info)?,
+                        location: self.meta_locations.gen_segment_info_location(),
+                        segment: Arc::new(segment_info),
+                    }
                 }
             }
             State::PreCommitSegment { location, segment } => {
@@ -281,7 +313,6 @@ impl Processor for FuseTableSink {
                 // TODO: dyn operation for table trait
                 let log_entry = AppendOperationLogEntry::new(location, segment);
                 let data_block = DataBlock::try_from(log_entry)?;
-                println!("precommit segment precommit");
                 self.ctx.push_precommit_block(data_block);
             }
             _state => {
@@ -356,11 +387,26 @@ impl Processor for FuseTableSink {
                     bloom_index_location,
                     bloom_index_size,
                     self.write_settings.table_compression.into(),
+                    self.mode.clone(),
                 )?;
 
-                if self.accumulator.summary_block_count >= self.write_settings.block_per_seg as u64
-                {
-                    self.state = State::GenerateSegment;
+                if self.mode.eq_ignore_ascii_case("skipfile") {
+                    let key_with_max_value = self
+                        .accumulator
+                        .block_meta_map
+                        .iter()
+                        .max_by_key(|b| b.1.block_metas.len())
+                        .unwrap();
+
+                    if key_with_max_value.1.block_metas.len() > 10 {
+                        self.state = State::GenerateSegment(Some(key_with_max_value.0.clone()));
+                    }
+                } else {
+                    if self.accumulator.summary_block_count
+                        >= self.write_settings.block_per_seg as u64
+                    {
+                        self.state = State::GenerateSegment(None);
+                    }
                 }
             }
             State::SerializedSegment {

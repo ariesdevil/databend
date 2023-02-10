@@ -39,6 +39,9 @@ pub struct SegmentInfo {
     pub blocks: Vec<Arc<BlockMeta>>,
     /// summary statistics
     pub summary: Statistics,
+    /// optional filename
+    /// set iff the blocks contained in a segment all come from the same file
+    filename: Option<String>,
 }
 
 /// Meta information of a block
@@ -126,11 +129,29 @@ impl SegmentInfo {
             format_version: SegmentInfo::VERSION,
             blocks,
             summary,
+            filename: None,
+        }
+    }
+
+    pub fn new_with_filename(
+        blocks: Vec<Arc<BlockMeta>>,
+        summary: Statistics,
+        filename: Option<String>,
+    ) -> Self {
+        Self {
+            format_version: SegmentInfo::VERSION,
+            blocks,
+            summary,
+            filename,
         }
     }
 
     pub fn format_version(&self) -> u64 {
         self.format_version
+    }
+
+    pub fn file_name(&self) -> Option<String> {
+        self.filename.clone()
     }
 
     // Total block bytes of this segment.
@@ -153,6 +174,7 @@ impl SegmentInfo {
                 .map(|b| Arc::new(BlockMeta::from_v0(&b, fields)))
                 .collect::<_>(),
             summary,
+            filename: None,
         }
     }
 
@@ -166,6 +188,7 @@ impl SegmentInfo {
                 .map(|b| Arc::new(BlockMeta::from_v1(b.as_ref(), fields)))
                 .collect::<_>(),
             summary,
+            filename: None,
         }
     }
 }

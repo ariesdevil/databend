@@ -378,6 +378,10 @@ impl CopyInterpreterV2 {
                     vec![]
                 };
                 println!("finish pipeline skipped files: {:?}", skipped_files);
+
+                let skipfile_count = ctx.get_skipfile_count();
+                println!("skipfile count on finished {:?}", skipfile_count);
+
                 for file in &need_copied_files {
                     // Short the etag to 7 bytes for less space in metasrv.
                     let short_etag = file.etag.clone().map(|mut v| {

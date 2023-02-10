@@ -45,11 +45,6 @@ impl<I: InputFormatPipe> DeserializeProcessor<I> {
     }
 
     fn process(&mut self) -> Result<()> {
-        println!("enter deserialize processor process");
-        println!(
-            "deserialize input buffer: {}",
-            self.input_buffer.as_ref().is_some()
-        );
         let blocks = self.block_builder.deserialize(self.input_buffer.take())?;
         for b in blocks.into_iter() {
             if !b.is_empty() {

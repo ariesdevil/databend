@@ -324,10 +324,21 @@ impl<T: InputFormatTextBase> InputFormat for T {
                 stage_info.file_format_options.compression,
                 path,
             )?;
-            let split_size = stage_info.copy_options.split_size;
+            // let split_size = stage_info.copy_options.split_size;
+            let split_size = 300;
+            println!(
+                "compress:{}, splittable:{}, split size:{}",
+                compress_alg.is_none(),
+                T::is_splittable(),
+                split_size
+            );
             if compress_alg.is_none() && T::is_splittable() && split_size > 0 {
                 let split_offsets = split_by_size(size, split_size);
                 let num_file_splits = split_offsets.len();
+                println!(
+                    "split file {} of size {} to {} {} bytes splits",
+                    path, size, num_file_splits, split_size
+                );
                 tracing::debug!(
                     "split file {} of size {} to {} {} bytes splits",
                     path,
@@ -352,6 +363,7 @@ impl<T: InputFormatTextBase> InputFormat for T {
                     }));
                 }
             } else {
+                println!("enter split else");
                 let file = Arc::new(FileInfo {
                     path: path.clone(),
                     size, // dummy
@@ -483,7 +495,6 @@ pub struct BlockBuilder<T> {
 
 impl<T: InputFormatTextBase> BlockBuilder<T> {
     fn flush(&mut self, file_name: String) -> Result<Vec<DataBlock>> {
-        println!("flush filename: {file_name}");
         let columns: Vec<Column> = self
             .mutable_columns
             .iter_mut()
@@ -499,6 +510,9 @@ impl<T: InputFormatTextBase> BlockBuilder<T> {
         if columns.is_empty() || columns[0].len() == 0 {
             Ok(vec![])
         } else {
+            if file_name.is_empty() {
+                println!("empty string flush wrong");
+            }
             Ok(vec![
                 DataBlock::new_from_columns(columns).attach_filename(file_name),
             ])
@@ -545,8 +559,12 @@ impl<T: InputFormatTextBase> BlockBuilderTrait for BlockBuilder<T> {
 
     fn deserialize(&mut self, batch: Option<RowBatch>) -> Result<Vec<DataBlock>> {
         if let Some(b) = batch {
-            println!("enter rowbatch");
-            self.current_filename = b.split_info.file.path.clone();
+            if !self
+                .current_filename
+                .eq_ignore_ascii_case(&b.split_info.file.path)
+            {
+                self.current_filename = b.split_info.file.path.clone();
+            }
             self.num_rows += b.row_ends.len();
             let r = T::deserialize(self, b)?;
             self.merge_map(r, self.current_filename.clone());
