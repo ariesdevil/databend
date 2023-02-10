@@ -81,6 +81,7 @@ pub struct QueryContextShared {
     pub(in crate::sessions) precommit_blocks: Arc<RwLock<Vec<DataBlock>>>,
     pub(in crate::sessions) stage_attachment: Arc<RwLock<Option<StageAttachment>>>,
     pub(in crate::sessions) created_time: SystemTime,
+    #[allow(clippy::type_complexity)]
     pub(in crate::sessions) on_error_map:
         Arc<RwLock<Option<Arc<DashMap<String, HashMap<u16, InputError>>>>>>,
     pub(in crate::sessions) skipfile_count: Arc<DashMap<String, usize>>,

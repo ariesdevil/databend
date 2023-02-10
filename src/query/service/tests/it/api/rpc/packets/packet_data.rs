@@ -38,6 +38,7 @@ async fn test_precommit_ser_and_deser() -> Result<()> {
         None,
         4,
         Compression::Lz4Raw,
+        None,
     );
     let segment_info = SegmentInfo::new(vec![Arc::new(block_meta)], Statistics::default());
     let log_entry = AppendOperationLogEntry::new("/_sg/1.json".to_string(), Arc::new(segment_info));

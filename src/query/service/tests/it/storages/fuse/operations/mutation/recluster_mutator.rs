@@ -64,6 +64,7 @@ async fn test_recluster_mutator_block_select() -> Result<()> {
             None,
             0,
             meta::Compression::Lz4Raw,
+            None,
         ));
         let segment = SegmentInfo::new(vec![test_block_meta], Statistics::default());
         Ok::<_, ErrorCode>((seg_writer.write_segment(segment).await?, location))

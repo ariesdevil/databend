@@ -240,8 +240,14 @@ async fn test_accumulator() -> common_exception::Result<()> {
     for item in blocks {
         let block = item?;
         let col_stats = gen_columns_statistics(&block, None, &schema)?;
-        let block_statistics =
-            BlockStatistics::from(&block, "does_not_matter".to_owned(), None, None, &schema)?;
+        let block_statistics = BlockStatistics::from(
+            &block,
+            "does_not_matter".to_owned(),
+            None,
+            None,
+            None,
+            &schema,
+        )?;
         let block_writer = BlockWriter::new(&operator, &loc_generator);
         let block_meta = block_writer
             .write(FuseStorageFormat::Parquet, &schema, block, col_stats, None)
@@ -547,6 +553,7 @@ fn test_reduce_block_meta() -> common_exception::Result<()> {
             None,
             bloom_filter_index_size,
             Compression::Lz4Raw,
+            None,
         );
         blocks.push(block_meta);
     }

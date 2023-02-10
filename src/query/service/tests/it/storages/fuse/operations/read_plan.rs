@@ -97,6 +97,7 @@ fn test_to_partitions() -> Result<()> {
         bloom_filter_location,
         bloom_filter_size,
         meta::Compression::Lz4Raw,
+        None,
     ));
 
     let blocks_metas = (0..num_of_block)

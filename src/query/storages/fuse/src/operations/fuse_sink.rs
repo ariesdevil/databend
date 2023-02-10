@@ -201,11 +201,9 @@ impl Processor for FuseTableSink {
                     self.state = State::GenerateSegment(Some(key));
                     return Ok(Event::Sync);
                 }
-            } else {
-                if self.accumulator.summary_row_count != 0 {
-                    self.state = State::GenerateSegment(None);
-                    return Ok(Event::Sync);
-                }
+            } else if self.accumulator.summary_row_count != 0 {
+                self.state = State::GenerateSegment(None);
+                return Ok(Event::Sync);
             }
             if let Some(output) = &self.output {
                 output.finish();
@@ -401,12 +399,10 @@ impl Processor for FuseTableSink {
                     if key_with_max_value.1.block_metas.len() > 10 {
                         self.state = State::GenerateSegment(Some(key_with_max_value.0.clone()));
                     }
-                } else {
-                    if self.accumulator.summary_block_count
-                        >= self.write_settings.block_per_seg as u64
-                    {
-                        self.state = State::GenerateSegment(None);
-                    }
+                } else if self.accumulator.summary_block_count
+                    >= self.write_settings.block_per_seg as u64
+                {
+                    self.state = State::GenerateSegment(None);
                 }
             }
             State::SerializedSegment {

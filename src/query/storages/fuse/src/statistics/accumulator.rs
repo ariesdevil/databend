@@ -65,6 +65,7 @@ impl StatisticsAccumulator {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn add_block(
         &mut self,
         file_size: u64,
@@ -112,6 +113,7 @@ impl StatisticsAccumulator {
         super::reduce_block_statistics(&self.blocks_statistics, None, None)
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn add(
         &mut self,
         file_size: u64,
@@ -122,13 +124,6 @@ impl StatisticsAccumulator {
         block_compression: meta::Compression,
         mode: String,
     ) -> Result<()> {
-        // row_count: acc.summary_row_count,
-        // block_count: acc.summary_block_count,
-        // perfect_block_count: acc.perfect_block_count,
-        // uncompressed_byte_size: acc.in_memory_size,
-        // compressed_byte_size: acc.file_size,
-        // index_size: acc.index_size,
-        // col_stats,
         self.file_size += file_size;
         self.index_size += bloom_filter_index_size;
         self.summary_block_count += 1;
@@ -151,7 +146,7 @@ impl StatisticsAccumulator {
             self.perfect_block_count += 1;
         }
 
-        if mode == "skipfile".to_string() {
+        if mode.eq_ignore_ascii_case("skipfile") {
             let block_meta = Arc::new(BlockMeta::new(
                 row_count,
                 block_size,

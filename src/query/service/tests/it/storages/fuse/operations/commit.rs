@@ -441,7 +441,7 @@ impl TableContext for CtxDelegation {
         todo!()
     }
 
-    fn set_on_error_map(&self, map: Arc<DashMap<String, HashMap<u16, InputError>>>) {
+    fn set_on_error_map(&self, _on_error_map: Arc<DashMap<String, HashMap<u16, InputError>>>) {
         todo!()
     }
 
