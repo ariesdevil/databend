@@ -356,7 +356,7 @@ impl BlockBuilderTrait for ParquetBlockBuilder {
             if let Err(e) = block_result {
                 match self.ctx.on_error_mode {
                     OnErrorMode::Continue | OnErrorMode::SkipFileNum(_) => {
-                        if let Some(ref on_error_map) = self.ctx.on_error_map {
+                        return if let Some(ref on_error_map) = self.ctx.on_error_map {
                             on_error_map
                                 .entry(file_name.clone())
                                 .and_modify(|x| {
@@ -371,10 +371,10 @@ impl BlockBuilderTrait for ParquetBlockBuilder {
                                     err: e,
                                     num: 1,
                                 })]));
-                            return Ok(vec![DataBlock::empty_with_belong_to(file_name)]);
+                            Ok(vec![DataBlock::empty_with_belong_to(file_name)])
                         } else {
-                            return Err(e);
-                        }
+                            Err(e)
+                        };
                     }
                     OnErrorMode::AbortNum(_) => {
                         return Err(e);
