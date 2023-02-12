@@ -37,7 +37,6 @@ impl Sink for ContextSink {
     const NAME: &'static str = "ContextSink";
 
     fn consume(&mut self, block: DataBlock) -> Result<()> {
-        println!("context sink precommit");
         self.ctx.push_precommit_block(block);
         Ok(())
     }
