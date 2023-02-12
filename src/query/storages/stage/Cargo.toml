@@ -31,7 +31,7 @@ common-users = { path = "../../users" }
 async-trait = { version = "0.1.57", package = "async-trait-fn" }
 backon = "0.4"
 chrono = { workspace = true }
-dashmap= "5.4.0"
+dashmap = "5.4.0"
 futures = "0.3.24"
 itertools = "0.10.5"
 once_cell = "1.15.0"
