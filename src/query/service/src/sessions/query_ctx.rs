@@ -41,6 +41,7 @@ use common_expression::date_helper::TzFactory;
 use common_expression::DataBlock;
 use common_expression::FunctionContext;
 use common_io::prelude::FormatSettings;
+use common_meta_app::principal::OnErrorMode;
 use common_meta_app::principal::RoleInfo;
 use common_meta_app::principal::UserInfo;
 use common_meta_app::schema::TableInfo;
@@ -193,6 +194,23 @@ impl QueryContext {
 
     pub fn get_created_time(&self) -> SystemTime {
         self.shared.created_time
+    }
+
+    pub fn get_skipped_file(&self, threshold: usize) -> Option<Vec<String>> {
+        if let Some(on_error_map) = self.get_on_error_map() {
+            if on_error_map.is_empty() {
+                return None;
+            }
+            let mut v = Vec::new();
+            on_error_map.iter().for_each(|x| {
+                let num: usize = x.value().iter().map(|h| h.1.num).sum();
+                if num >= threshold {
+                    v.push(x.key().to_string());
+                }
+            });
+            return Some(v);
+        }
+        None
     }
 }
 
@@ -366,8 +384,11 @@ impl TableContext for QueryContext {
         self.shared.set_on_error_map(map);
     }
 
-    fn get_skipfile_count(&self) -> Arc<DashMap<String, usize>> {
-        self.shared.get_skipfile_count()
+    fn get_on_error_mode(&self) -> Option<OnErrorMode> {
+        self.shared.get_on_error_mode()
+    }
+    fn set_on_error_mode(&self, mode: OnErrorMode) {
+        self.shared.set_on_error_mode(mode)
     }
 
     fn get_maximum_error_per_file(&self) -> Option<HashMap<String, ErrorCode>> {

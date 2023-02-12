@@ -26,6 +26,7 @@ use common_exception::Result;
 use common_expression::DataBlock;
 use common_expression::FunctionContext;
 use common_io::prelude::FormatSettings;
+use common_meta_app::principal::OnErrorMode;
 use common_meta_app::principal::RoleInfo;
 use common_meta_app::principal::UserInfo;
 use common_pipeline_core::InputError;
@@ -110,7 +111,8 @@ pub trait TableContext: Send + Sync {
     fn get_stage_attachment(&self) -> Option<StageAttachment>;
     fn get_on_error_map(&self) -> Option<Arc<DashMap<String, HashMap<u16, InputError>>>>;
     fn set_on_error_map(&self, map: Arc<DashMap<String, HashMap<u16, InputError>>>);
-    fn get_skipfile_count(&self) -> Arc<DashMap<String, usize>>;
+    fn get_on_error_mode(&self) -> Option<OnErrorMode>;
+    fn set_on_error_mode(&self, mode: OnErrorMode);
 
     fn get_maximum_error_per_file(&self) -> Option<HashMap<String, ErrorCode>>;
 

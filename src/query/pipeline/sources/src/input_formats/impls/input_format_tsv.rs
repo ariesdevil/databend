@@ -173,15 +173,8 @@ impl InputFormatTextBase for InputFormatTSV {
                         start = *end;
                         continue;
                     }
-                    OnErrorMode::SkipFileNum(n) => {
-                        Self::on_error_skipfile(
-                            columns,
-                            num_rows,
-                            n,
-                            &builder.ctx.on_error_count,
-                            &mut error_map,
-                            e.clone(),
-                        );
+                    OnErrorMode::SkipFileNum(_) => {
+                        Self::on_error_skipfile(columns, num_rows, &mut error_map, e.clone());
                         start = *end;
                         continue;
                     }

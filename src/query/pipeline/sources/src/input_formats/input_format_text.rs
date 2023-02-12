@@ -28,6 +28,7 @@ use common_expression::TypeDeserializer;
 use common_expression::TypeDeserializerImpl;
 use common_formats::FieldDecoder;
 use common_formats::FileFormatOptionsExt;
+use common_meta_app::principal::OnErrorMode;
 use common_meta_app::principal::StageFileFormatType;
 use common_meta_app::principal::UserStageInfo;
 use common_pipeline_core::InputError;
@@ -272,8 +273,6 @@ pub trait InputFormatTextBase: Sized + Send + Sync + 'static {
     fn on_error_skipfile(
         columns: &mut Vec<TypeDeserializerImpl>,
         num_rows: usize,
-        skipfile_num: u64,
-        error_count: &AtomicU64,
         error_map: &mut HashMap<u16, InputError>,
         e: ErrorCode,
     ) {
@@ -284,13 +283,10 @@ pub trait InputFormatTextBase: Sized + Send + Sync + 'static {
             }
         });
 
-        if skipfile_num <= 1 || error_count.fetch_add(1, Ordering::Relaxed) >= skipfile_num - 1 {
-            println!("enter insert to error map");
-            error_map
-                .entry(e.code())
-                .and_modify(|input_error| input_error.num += 1)
-                .or_insert(InputError { err: e, num: 1 });
-        }
+        error_map
+            .entry(e.code())
+            .and_modify(|input_error| input_error.num += 1)
+            .or_insert(InputError { err: e, num: 1 });
     }
 }
 
@@ -324,21 +320,10 @@ impl<T: InputFormatTextBase> InputFormat for T {
                 stage_info.file_format_options.compression,
                 path,
             )?;
-            // let split_size = stage_info.copy_options.split_size;
-            let split_size = 300;
-            println!(
-                "compress:{}, splittable:{}, split size:{}",
-                compress_alg.is_none(),
-                T::is_splittable(),
-                split_size
-            );
+            let split_size = stage_info.copy_options.split_size;
             if compress_alg.is_none() && T::is_splittable() && split_size > 0 {
                 let split_offsets = split_by_size(size, split_size);
                 let num_file_splits = split_offsets.len();
-                println!(
-                    "split file {} of size {} to {} {} bytes splits",
-                    path, size, num_file_splits, split_size
-                );
                 tracing::debug!(
                     "split file {} of size {} to {} {} bytes splits",
                     path,
@@ -363,7 +348,6 @@ impl<T: InputFormatTextBase> InputFormat for T {
                     }));
                 }
             } else {
-                println!("enter split else");
                 let file = Arc::new(FileInfo {
                     path: path.clone(),
                     size, // dummy
@@ -510,9 +494,6 @@ impl<T: InputFormatTextBase> BlockBuilder<T> {
         if columns.is_empty() || columns[0].len() == 0 {
             Ok(vec![])
         } else {
-            if file_name.is_empty() {
-                println!("empty string flush wrong");
-            }
             Ok(vec![
                 DataBlock::new_from_columns(columns).attach_filename(file_name),
             ])
@@ -525,7 +506,6 @@ impl<T: InputFormatTextBase> BlockBuilder<T> {
 
     fn merge_map(&self, error_map: HashMap<u16, InputError>, file_name: String) {
         if let Some(on_error_map) = self.ctx.on_error_map.clone() {
-            println!("enter merge map");
             on_error_map
                 .entry(file_name)
                 .and_modify(|x| {
@@ -559,27 +539,34 @@ impl<T: InputFormatTextBase> BlockBuilderTrait for BlockBuilder<T> {
 
     fn deserialize(&mut self, batch: Option<RowBatch>) -> Result<Vec<DataBlock>> {
         if let Some(b) = batch {
-            if !self
-                .current_filename
-                .eq_ignore_ascii_case(&b.split_info.file.path)
+            let path = b.split_info.file.path.clone();
+            let mut result = vec![];
+            // if file path changed, flush previous blocks of same file.
+            if matches!(self.ctx.on_error_mode, OnErrorMode::SkipFileNum(_))
+                && !self.current_filename.eq_ignore_ascii_case(&path)
             {
-                self.current_filename = b.split_info.file.path.clone();
+                if self.num_rows > 0 {
+                    result.extend(self.flush(self.current_filename.clone())?);
+                }
+                self.current_filename = path.clone();
             }
             self.num_rows += b.row_ends.len();
             let r = T::deserialize(self, b)?;
-            self.merge_map(r, self.current_filename.clone());
+            self.merge_map(r, path);
             let mem = self.memory_size();
             tracing::debug!(
                 "chunk builder added new batch: row {} size {}",
                 self.num_rows,
                 mem
             );
+
             if self.num_rows >= self.ctx.block_compact_thresholds.min_rows_per_block
                 || mem > self.ctx.block_compact_thresholds.max_bytes_per_block
             {
-                self.flush(self.current_filename.clone())
+                result.extend(self.flush(self.current_filename.clone())?);
+                Ok(result)
             } else {
-                Ok(vec![])
+                Ok(result)
             }
         } else {
             self.flush(self.current_filename.clone())

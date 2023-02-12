@@ -119,11 +119,9 @@ impl<I: InputFormatPipe> Processor for DeserializeSource<I> {
     }
 
     async fn async_process(&mut self) -> Result<()> {
-        println!("enter source async process");
         assert!(self.input_buffer.is_none() && !self.input_finished);
         match self.input_rx.recv().await {
             Ok(row_batch) => {
-                println!("enter input rx recv");
                 self.input_buffer = Some(row_batch?);
             }
             Err(_) => {

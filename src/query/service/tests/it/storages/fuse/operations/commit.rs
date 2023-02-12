@@ -35,6 +35,7 @@ use common_exception::Result;
 use common_expression::DataBlock;
 use common_expression::FunctionContext;
 use common_io::prelude::FormatSettings;
+use common_meta_app::principal::OnErrorMode;
 use common_meta_app::principal::RoleInfo;
 use common_meta_app::principal::UserInfo;
 use common_meta_app::schema::CountTablesReply;
@@ -444,9 +445,11 @@ impl TableContext for CtxDelegation {
     fn set_on_error_map(&self, _on_error_map: Arc<DashMap<String, HashMap<u16, InputError>>>) {
         todo!()
     }
-
-    fn get_skipfile_count(&self) -> Arc<DashMap<String, usize>> {
-        todo!();
+    fn get_on_error_mode(&self) -> Option<OnErrorMode> {
+        todo!()
+    }
+    fn set_on_error_mode(&self, _mode: OnErrorMode) {
+        todo!()
     }
 
     fn get_maximum_error_per_file(&self) -> Option<HashMap<String, ErrorCode>> {

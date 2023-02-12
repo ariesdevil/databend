@@ -252,12 +252,10 @@ impl InputFormatTextBase for InputFormatXML {
                                         .map_err(|e| xml_error(&e.message(), path, num_rows))?;
                                         continue;
                                     }
-                                    OnErrorMode::SkipFileNum(n) => {
+                                    OnErrorMode::SkipFileNum(_) => {
                                         Self::on_error_skipfile(
                                             columns,
                                             num_rows,
-                                            n,
-                                            &builder.ctx.on_error_count,
                                             &mut error_map,
                                             e.clone(),
                                         );

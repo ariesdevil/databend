@@ -28,6 +28,7 @@ use common_expression::FieldIndex;
 use common_expression::TableSchemaRef;
 use common_io::constants::DEFAULT_BLOCK_BUFFER_SIZE;
 use common_io::constants::DEFAULT_BLOCK_INDEX_BUFFER_SIZE;
+use common_meta_app::principal::OnErrorMode;
 use common_pipeline_core::processors::port::OutputPort;
 use opendal::Operator;
 use storages_common_blocks::blocks_to_parquet;
@@ -125,7 +126,7 @@ enum State {
 }
 
 pub struct FuseTableSink {
-    mode: String,
+    mode: Option<OnErrorMode>,
     state: State,
     input: Arc<InputPort>,
     ctx: Arc<dyn TableContext>,
@@ -154,7 +155,7 @@ impl FuseTableSink {
         output: Option<Arc<OutputPort>>,
     ) -> Result<ProcessorPtr> {
         Ok(ProcessorPtr::create(Box::new(FuseTableSink {
-            mode: "skipfile".to_string(),
+            mode: ctx.get_on_error_mode(),
             ctx,
             input,
             data_accessor,
@@ -195,16 +196,21 @@ impl Processor for FuseTableSink {
         }
 
         if self.input.is_finished() {
-            if self.mode.eq_ignore_ascii_case("skipfile") {
+            if self.mode.is_none()
+                || !matches!(self.mode.clone().unwrap(), OnErrorMode::SkipFileNum(_))
+            {
+                if self.accumulator.summary_row_count != 0 {
+                    self.state = State::GenerateSegment(None);
+                    return Ok(Event::Sync);
+                }
+            } else {
                 let key = self.accumulator.block_meta_map.keys().next().cloned();
                 if let Some(key) = key {
                     self.state = State::GenerateSegment(Some(key));
                     return Ok(Event::Sync);
                 }
-            } else if self.accumulator.summary_row_count != 0 {
-                self.state = State::GenerateSegment(None);
-                return Ok(Event::Sync);
             }
+
             if let Some(output) = &self.output {
                 output.finish();
             }
@@ -378,31 +384,43 @@ impl Processor for FuseTableSink {
                         (None, 0u64)
                     };
 
-                self.accumulator.add_block(
-                    size,
-                    meta_data,
-                    block_statistics,
-                    bloom_index_location,
-                    bloom_index_size,
-                    self.write_settings.table_compression.into(),
-                    self.mode.clone(),
-                )?;
+                match self.mode.clone() {
+                    Some(mode) if matches!(mode, OnErrorMode::SkipFileNum(_)) => {
+                        self.accumulator.add_block_with_mode(
+                            size,
+                            meta_data,
+                            block_statistics,
+                            bloom_index_location,
+                            bloom_index_size,
+                            self.write_settings.table_compression.into(),
+                            mode,
+                        )?;
+                        let key_with_max_value = self
+                            .accumulator
+                            .block_meta_map
+                            .iter()
+                            .max_by_key(|b| b.1.block_metas.len())
+                            .unwrap();
 
-                if self.mode.eq_ignore_ascii_case("skipfile") {
-                    let key_with_max_value = self
-                        .accumulator
-                        .block_meta_map
-                        .iter()
-                        .max_by_key(|b| b.1.block_metas.len())
-                        .unwrap();
-
-                    if key_with_max_value.1.block_metas.len() > 10 {
-                        self.state = State::GenerateSegment(Some(key_with_max_value.0.clone()));
+                        if key_with_max_value.1.block_metas.len() > 10 {
+                            self.state = State::GenerateSegment(Some(key_with_max_value.0.clone()));
+                        }
                     }
-                } else if self.accumulator.summary_block_count
-                    >= self.write_settings.block_per_seg as u64
-                {
-                    self.state = State::GenerateSegment(None);
+                    _ => {
+                        self.accumulator.add_block(
+                            size,
+                            meta_data,
+                            block_statistics,
+                            bloom_index_location,
+                            bloom_index_size,
+                            self.write_settings.table_compression.into(),
+                        )?;
+                        if self.accumulator.summary_block_count
+                            >= self.write_settings.block_per_seg as u64
+                        {
+                            self.state = State::GenerateSegment(None);
+                        }
+                    }
                 }
             }
             State::SerializedSegment {

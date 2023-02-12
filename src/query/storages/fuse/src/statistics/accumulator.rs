@@ -19,6 +19,7 @@ use common_exception::Result;
 use common_expression::BlockThresholds;
 use common_expression::ColumnId;
 use common_expression::DataBlock;
+use common_meta_app::principal::OnErrorMode;
 use storages_common_table_meta::meta;
 use storages_common_table_meta::meta::BlockMeta;
 use storages_common_table_meta::meta::ColumnMeta;
@@ -74,9 +75,28 @@ impl StatisticsAccumulator {
         bloom_filter_index_location: Option<Location>,
         bloom_filter_index_size: u64,
         block_compression: meta::Compression,
-        mode: String,
     ) -> Result<()> {
         self.add(
+            file_size,
+            col_metas,
+            block_statistics,
+            bloom_filter_index_location,
+            bloom_filter_index_size,
+            block_compression,
+        )
+    }
+    #[allow(clippy::too_many_arguments)]
+    pub fn add_block_with_mode(
+        &mut self,
+        file_size: u64,
+        col_metas: HashMap<ColumnId, ColumnMeta>,
+        block_statistics: BlockStatistics,
+        bloom_filter_index_location: Option<Location>,
+        bloom_filter_index_size: u64,
+        block_compression: meta::Compression,
+        mode: OnErrorMode,
+    ) -> Result<()> {
+        self.add_by_mode(
             file_size,
             col_metas,
             block_statistics,
@@ -105,7 +125,6 @@ impl StatisticsAccumulator {
             bloom_filter_index_location,
             bloom_filter_index_size,
             block_compression,
-            "skipfile".to_string(),
         )
     }
 
@@ -113,7 +132,6 @@ impl StatisticsAccumulator {
         super::reduce_block_statistics(&self.blocks_statistics, None, None)
     }
 
-    #[allow(clippy::too_many_arguments)]
     fn add(
         &mut self,
         file_size: u64,
@@ -122,7 +140,6 @@ impl StatisticsAccumulator {
         bloom_filter_index_location: Option<Location>,
         bloom_filter_index_size: u64,
         block_compression: meta::Compression,
-        mode: String,
     ) -> Result<()> {
         self.file_size += file_size;
         self.index_size += bloom_filter_index_size;
@@ -146,7 +163,46 @@ impl StatisticsAccumulator {
             self.perfect_block_count += 1;
         }
 
-        if mode.eq_ignore_ascii_case("skipfile") {
+        self.blocks_metas.push(Arc::new(BlockMeta::new(
+            row_count,
+            block_size,
+            file_size,
+            col_stats,
+            column_meta,
+            cluster_stats,
+            data_location,
+            bloom_filter_index_location,
+            bloom_filter_index_size,
+            block_compression,
+            belong_to,
+        )));
+
+        Ok(())
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn add_by_mode(
+        &mut self,
+        file_size: u64,
+        column_meta: HashMap<u32, ColumnMeta>,
+        block_statistics: BlockStatistics,
+        bloom_filter_index_location: Option<Location>,
+        bloom_filter_index_size: u64,
+        block_compression: meta::Compression,
+        mode: OnErrorMode,
+    ) -> Result<()> {
+        if matches!(mode, OnErrorMode::SkipFileNum(_)) {
+            self.summary_block_count += 1;
+            self.in_memory_size += block_statistics.block_bytes_size;
+            self.summary_row_count += block_statistics.block_rows_size;
+
+            let row_count = block_statistics.block_rows_size;
+            let block_size = block_statistics.block_bytes_size;
+            let col_stats = block_statistics.block_column_statistics.clone();
+            let data_location = (block_statistics.block_file_location, DataBlock::VERSION);
+            let cluster_stats = block_statistics.block_cluster_statistics;
+            let belong_to = block_statistics.block_belong_to;
+
             let block_meta = Arc::new(BlockMeta::new(
                 row_count,
                 block_size,
@@ -201,21 +257,15 @@ impl StatisticsAccumulator {
                     block_metas
                 });
         } else {
-            self.blocks_metas.push(Arc::new(BlockMeta::new(
-                row_count,
-                block_size,
+            return self.add(
                 file_size,
-                col_stats,
                 column_meta,
-                cluster_stats,
-                data_location,
+                block_statistics,
                 bloom_filter_index_location,
                 bloom_filter_index_size,
                 block_compression,
-                belong_to,
-            )));
+            );
         }
-
         Ok(())
     }
 }

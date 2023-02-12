@@ -27,6 +27,7 @@ use common_config::Config;
 use common_exception::ErrorCode;
 use common_exception::Result;
 use common_expression::DataBlock;
+use common_meta_app::principal::OnErrorMode;
 use common_meta_app::principal::RoleInfo;
 use common_meta_app::principal::UserInfo;
 use common_pipeline_core::InputError;
@@ -84,7 +85,7 @@ pub struct QueryContextShared {
     #[allow(clippy::type_complexity)]
     pub(in crate::sessions) on_error_map:
         Arc<RwLock<Option<Arc<DashMap<String, HashMap<u16, InputError>>>>>>,
-    pub(in crate::sessions) skipfile_count: Arc<DashMap<String, usize>>,
+    pub(in crate::sessions) on_error_mode: Arc<RwLock<Option<OnErrorMode>>>,
 }
 
 impl QueryContextShared {
@@ -115,7 +116,7 @@ impl QueryContextShared {
             stage_attachment: Arc::new(RwLock::new(None)),
             created_time: SystemTime::now(),
             on_error_map: Arc::new(RwLock::new(None)),
-            skipfile_count: Arc::new(DashMap::new()),
+            on_error_mode: Arc::new(RwLock::new(None)),
         }))
     }
 
@@ -133,8 +134,12 @@ impl QueryContextShared {
         self.on_error_map.read().as_ref().cloned()
     }
 
-    pub fn get_skipfile_count(&self) -> Arc<DashMap<String, usize>> {
-        self.skipfile_count.clone()
+    pub fn get_on_error_mode(&self) -> Option<OnErrorMode> {
+        self.on_error_mode.read().clone()
+    }
+    pub fn set_on_error_mode(&self, mode: OnErrorMode) {
+        let mut guard = self.on_error_mode.write();
+        *guard = Some(mode);
     }
 
     pub fn kill(&self, cause: ErrorCode) {

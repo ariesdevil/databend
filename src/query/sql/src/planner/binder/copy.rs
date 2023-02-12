@@ -236,6 +236,8 @@ impl<'a> Binder {
         let (mut stage_info, path) =
             parse_stage_location_v2(&self.ctx, src_stage, src_path).await?;
         self.apply_stage_options(stmt, &mut stage_info)?;
+        self.ctx
+            .set_on_error_mode(stage_info.copy_options.on_error.clone());
 
         let from = DataSourcePlan {
             catalog: dst_catalog_name.to_string(),
@@ -295,6 +297,8 @@ impl<'a> Binder {
 
         let mut stage_info = UserStageInfo::new_external_stage(storage_params, &path);
         self.apply_stage_options(stmt, &mut stage_info)?;
+        self.ctx
+            .set_on_error_mode(stage_info.copy_options.on_error.clone());
         let from = DataSourcePlan {
             catalog: dst_catalog_name.to_string(),
             source_info: DataSourceInfo::StageSource(StageTableInfo {

@@ -140,16 +140,9 @@ impl InputFormatTextBase for InputFormatCSV {
                         continue;
                     }
 
-                    OnErrorMode::SkipFileNum(n) => {
+                    OnErrorMode::SkipFileNum(_) => {
                         println!("enter csv skip file");
-                        Self::on_error_skipfile(
-                            columns,
-                            num_rows,
-                            n,
-                            &builder.ctx.on_error_count,
-                            &mut error_map,
-                            e.clone(),
-                        );
+                        Self::on_error_skipfile(columns, num_rows, &mut error_map, e.clone());
                         start = *end;
                         field_end_idx += n_column;
                         continue;

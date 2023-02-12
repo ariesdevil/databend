@@ -29,6 +29,7 @@ use common_expression::infer_table_schema;
 use common_expression::DataBlock;
 use common_expression::DataField;
 use common_expression::DataSchemaRefExt;
+use common_meta_app::principal::OnErrorMode;
 use common_meta_app::principal::UserStageInfo;
 use common_meta_app::schema::GetTableCopiedFileReq;
 use common_meta_app::schema::TableCopiedFileInfo;
@@ -373,15 +374,17 @@ impl CopyInterpreterV2 {
                 let database_name = database_name.clone();
                 let catalog = catalog.clone();
                 let mut copied_files = BTreeMap::new();
-                let skipped_files = if let Some(error_map) = ctx.get_maximum_error_per_file() {
-                    error_map.keys().cloned().collect()
-                } else {
-                    vec![]
+                let skipped_files = match stage_info.copy_options.on_error {
+                    OnErrorMode::SkipFileNum(n) => {
+                        if let Some(v) = ctx.get_skipped_file(n as usize) {
+                            v
+                        } else {
+                            vec![]
+                        }
+                    }
+                    _ => vec![],
                 };
-                println!("finish pipeline skipped files: {:?}", skipped_files);
-
-                let skipfile_count = ctx.get_skipfile_count();
-                println!("skipfile count on finished {:?}", skipfile_count);
+                info!("finish pipeline skipped files: {:?}", skipped_files);
 
                 for file in &need_copied_files {
                     // Short the etag to 7 bytes for less space in metasrv.
@@ -399,19 +402,20 @@ impl CopyInterpreterV2 {
                     });
                 }
 
-                println!(
-                    "finish pipeline copied files: {:?}",
-                    copied_files.keys().cloned().collect::<String>()
-                );
-
                 return GlobalIORuntime::instance().block_on(async move {
                     // 1. Commit data.
                     let operations = ctx.consume_precommit_blocks();
                     let operations = operations
                         .into_iter()
-                        .filter(|d| !skipped_files.contains(&d.get_belong_to_filename().unwrap()))
+                        .filter(|d| {
+                            if let Some(path) = d.get_belong_to_filename() {
+                                if skipped_files.contains(&path) {
+                                    return false;
+                                }
+                            }
+                            true
+                        })
                         .collect::<Vec<DataBlock>>();
-                    println!("operations len:{}", operations.len());
                     info!(
                         "copy: try to commit operations:{}, elapsed:{}",
                         operations.len(),
