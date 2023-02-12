@@ -26,6 +26,7 @@ use common_catalog::table::AppendMode;
 use common_exception::ErrorCode;
 use common_exception::Result;
 use common_expression::infer_table_schema;
+use common_expression::DataBlock;
 use common_expression::DataField;
 use common_expression::DataSchemaRefExt;
 use common_meta_app::principal::UserStageInfo;
@@ -406,12 +407,11 @@ impl CopyInterpreterV2 {
                 return GlobalIORuntime::instance().block_on(async move {
                     // 1. Commit data.
                     let operations = ctx.consume_precommit_blocks();
-                    for db in &operations {
-                        println!(
-                            "finish pipeline datablock: {:?}",
-                            db.get_belong_to_filename()
-                        );
-                    }
+                    let operations = operations
+                        .into_iter()
+                        .filter(|d| !skipped_files.contains(&d.get_belong_to_filename().unwrap()))
+                        .collect::<Vec<DataBlock>>();
+                    println!("operations len:{}", operations.len());
                     info!(
                         "copy: try to commit operations:{}, elapsed:{}",
                         operations.len(),
