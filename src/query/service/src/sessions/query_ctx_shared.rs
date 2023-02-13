@@ -82,6 +82,8 @@ pub struct QueryContextShared {
     pub(in crate::sessions) precommit_blocks: Arc<RwLock<Vec<DataBlock>>>,
     pub(in crate::sessions) stage_attachment: Arc<RwLock<Option<StageAttachment>>>,
     pub(in crate::sessions) created_time: SystemTime,
+    // DashMap<file_path, HashMap<ErrorCode::code, (ErrorCode, Number of occurrences)>>
+    // We use this field to count maximum of one error found per data file.
     #[allow(clippy::type_complexity)]
     pub(in crate::sessions) on_error_map:
         Arc<RwLock<Option<Arc<DashMap<String, HashMap<u16, InputError>>>>>>,

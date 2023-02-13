@@ -52,6 +52,7 @@ use common_storage::StorageMetrics;
 use common_storages_fuse::TableContext;
 use common_storages_parquet::ParquetTable;
 use common_storages_stage::StageTable;
+use dashmap::mapref::multiple::RefMulti;
 use dashmap::DashMap;
 use parking_lot::RwLock;
 use tracing::debug;
@@ -397,11 +398,13 @@ impl TableContext for QueryContext {
                 return None;
             }
             let mut m = HashMap::<String, ErrorCode>::new();
-            on_error_map.iter().for_each(|x| {
-                if let Some(max_v) = x.value().iter().max_by_key(|entry| entry.1.num) {
-                    m.insert(x.key().to_string(), max_v.1.err.clone());
-                }
-            });
+            on_error_map
+                .iter()
+                .for_each(|x: RefMulti<String, HashMap<u16, InputError>>| {
+                    if let Some(max_v) = x.value().iter().max_by_key(|entry| entry.1.num) {
+                        m.insert(x.key().to_string(), max_v.1.err.clone());
+                    }
+                });
             return Some(m);
         }
         None

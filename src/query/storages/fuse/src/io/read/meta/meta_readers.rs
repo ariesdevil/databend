@@ -83,7 +83,6 @@ pub struct LoaderWrapper<T>(T);
 #[async_trait::async_trait]
 impl Loader<TableSnapshot> for LoaderWrapper<Operator> {
     async fn load(&self, params: &LoadParams) -> Result<TableSnapshot> {
-        // todo here.
         let reader = bytes_reader(&self.0, params.location.as_str(), params.len_hint).await?;
         let version = SnapshotVersion::try_from(params.ver)?;
         version.read(reader).await
