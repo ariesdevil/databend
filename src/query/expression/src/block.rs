@@ -117,7 +117,7 @@ impl DataBlock {
 
     #[inline]
     pub fn attach_filename(self, filename: String) -> Self {
-        Self::new_with_belong_to(self.columns, self.num_rows, filename)
+        Self::new_with_meta(self.columns, self.num_rows, Some(filename), self.meta)
     }
 
     #[inline]
