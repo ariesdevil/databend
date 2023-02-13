@@ -133,7 +133,6 @@ async fn bytes_reader(op: &Operator, path: &str, len: Option<u64>) -> Result<Obj
     let len = match len {
         Some(l) => l,
         None => {
-            // toto here.
             // TODO why do we need the content length (extra HEAD http req)? here we just need to read ALL the content
             let meta = object.metadata().await?;
             meta.content_length()
