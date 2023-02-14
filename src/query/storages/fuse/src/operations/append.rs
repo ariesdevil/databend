@@ -24,6 +24,7 @@ use common_expression::DataField;
 use common_expression::Expr;
 use common_expression::SortColumnDescription;
 use common_functions::scalars::BUILTIN_FUNCTIONS;
+use common_meta_app::principal::OnErrorMode;
 use common_pipeline_core::processors::processor::ProcessorPtr;
 use common_pipeline_core::Pipeline;
 use common_pipeline_transforms::processors::transforms::transform_block_compact_no_split::BlockCompactorNoSplit;
@@ -59,16 +60,23 @@ impl FuseTable {
                 })?;
             }
             AppendMode::Copy => {
-                let size = pipeline.output_len();
-                pipeline.resize(1)?;
-                pipeline.add_transform(|transform_input_port, transform_output_port| {
-                    Ok(ProcessorPtr::create(TransformCompact::try_create(
-                        transform_input_port,
-                        transform_output_port,
-                        BlockCompactorNoSplit::new(block_compact_thresholds),
-                    )?))
-                })?;
-                pipeline.resize(size)?;
+                let on_error_mode = ctx.get_on_error_mode();
+                // `OnErrorMode::SkipFile` should skip compact so that we can ensure
+                // one datablock contains only the same file's blocks.
+                if on_error_mode.is_none()
+                    || !matches!(on_error_mode.unwrap(), OnErrorMode::SkipFileNum(_))
+                {
+                    let size = pipeline.output_len();
+                    pipeline.resize(1)?;
+                    pipeline.add_transform(|transform_input_port, transform_output_port| {
+                        Ok(ProcessorPtr::create(TransformCompact::try_create(
+                            transform_input_port,
+                            transform_output_port,
+                            BlockCompactorNoSplit::new(block_compact_thresholds),
+                        )?))
+                    })?;
+                    pipeline.resize(size)?;
+                }
             }
         }
 
