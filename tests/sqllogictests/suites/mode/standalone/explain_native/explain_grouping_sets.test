@@ -7,17 +7,17 @@ EvalScalar
 ├── estimated rows: 1.00
 └── AggregateFinal
     ├── output columns: [a (#1), b (#2), c (#3), _grouping_id (#4)]
-    ├── group by: [a, b, c, _grouping_id]
+    ├── group by: [a (#1), b (#2), c (#3), _grouping_id (#4)]
     ├── aggregate functions: []
     ├── estimated rows: 1.00
     └── AggregatePartial
         ├── output columns: [#_group_by_key]
-        ├── group by: [a, b, c, _grouping_id]
+        ├── group by: [a (#1), b (#2), c (#3), _grouping_id (#4)]
         ├── aggregate functions: []
         ├── estimated rows: 1.00
         └── AggregateExpand
             ├── output columns: [a (#1), b (#2), c (#3), _grouping_id (#4)]
-            ├── grouping sets: [(a, b, c), (a, b), (a), ()]
+            ├── grouping sets: [(a (#1), b (#2), c (#3)), (a (#1), b (#2)), (a (#1)), ()]
             ├── estimated rows: 1.00
             └── EvalScalar
                 ├── output columns: [a (#1), b (#2), c (#3)]
@@ -42,17 +42,17 @@ EvalScalar
 ├── estimated rows: 1.00
 └── AggregateFinal
     ├── output columns: [a (#1), b (#2), c (#3), _grouping_id (#4)]
-    ├── group by: [a, b, c, _grouping_id]
+    ├── group by: [a (#1), b (#2), c (#3), _grouping_id (#4)]
     ├── aggregate functions: []
     ├── estimated rows: 1.00
     └── AggregatePartial
         ├── output columns: [#_group_by_key]
-        ├── group by: [a, b, c, _grouping_id]
+        ├── group by: [a (#1), b (#2), c (#3), _grouping_id (#4)]
         ├── aggregate functions: []
         ├── estimated rows: 1.00
         └── AggregateExpand
             ├── output columns: [a (#1), b (#2), c (#3), _grouping_id (#4)]
-            ├── grouping sets: [(), (a), (b), (c), (a, b), (a, c), (b, c), (a, b, c)]
+            ├── grouping sets: [(), (a (#1)), (b (#2)), (c (#3)), (a (#1), b (#2)), (a (#1), c (#3)), (b (#2), c (#3)), (a (#1), b (#2), c (#3))]
             ├── estimated rows: 1.00
             └── EvalScalar
                 ├── output columns: [a (#1), b (#2), c (#3)]

@@ -9,12 +9,12 @@ Exchange
 ├── exchange type: Merge
 └── AggregateFinal
     ├── output columns: [numbers_mt.number (#0)]
-    ├── group by: [number]
+    ├── group by: [number (#0)]
     ├── aggregate functions: []
     ├── estimated rows: 100000.00
     └── AggregatePartial
         ├── output columns: [#_group_by_key]
-        ├── group by: [number]
+        ├── group by: [number (#0)]
         ├── aggregate functions: []
         ├── estimated rows: 100000.00
         └── Exchange
@@ -42,7 +42,7 @@ Exchange
 ├── exchange type: Merge
 └── AggregateFinal
     ├── output columns: [numbers_mt.number (#0)]
-    ├── group by: [number]
+    ├── group by: [number (#0)]
     ├── aggregate functions: []
     ├── estimated rows: 100000.00
     └── Exchange
@@ -50,7 +50,7 @@ Exchange
         ├── exchange type: Hash(_group_by_key)
         └── AggregatePartial
             ├── output columns: [#_group_by_key]
-            ├── group by: [number]
+            ├── group by: [number (#0)]
             ├── aggregate functions: []
             ├── estimated rows: 100000.00
             └── TableScan
