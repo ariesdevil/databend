@@ -1697,7 +1697,16 @@ impl PipelineBuilder {
                     (start_bound, end_bound),
                 )?) as Box<dyn Processor>
             };
-            Ok(ProcessorPtr::create(transform))
+
+            if self.enable_profiling {
+                Ok(ProcessorPtr::create(ProcessorProfileWrapper::create(
+                    transform,
+                    window.plan_id,
+                    self.proc_profs.clone(),
+                )))
+            } else {
+                Ok(ProcessorPtr::create(transform))
+            }
         })?;
 
         self.main_pipeline.try_resize(old_output_len)
