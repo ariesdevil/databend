@@ -29,7 +29,6 @@ use databend_common_expression::types::*;
 use databend_common_expression::with_number_mapped_type;
 use databend_common_expression::AggregateFunctionRef;
 use databend_common_expression::Scalar;
-use ethnum::i256;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -118,29 +117,15 @@ where
 
         let mut buckets = build_histogram(&self.value_map, histogram_data.max_num_buckets);
 
-        let decimal_i128_size = histogram_data
-            .data_type
-            .clone()
-            .into_decimal()
-            .ok()
-            .and_then(|d| d.into_decimal128().ok());
-        let decimal_i256_size = histogram_data
-            .data_type
-            .clone()
-            .into_decimal()
-            .ok()
-            .and_then(|d| d.into_decimal256().ok());
-
-        let format_scalar = |scalar| {
-            let scalar = T::upcast_scalar(scalar);
-            let scalar = match scalar {
-                Scalar::Decimal(DecimalScalar::Decimal128(value, _)) => {
-                    i128::upcast_scalar(value, decimal_i128_size.unwrap())
+        let format_scalar = |scalar: <T as ValueType>::Scalar| {
+            let scalar = match &histogram_data.data_type {
+                DataType::Decimal(DecimalDataType::Decimal128(size)) => {
+                    Decimal128Type::upcast_decimal_scalar(scalar, *size)
                 }
-                Scalar::Decimal(DecimalScalar::Decimal256(value, _)) => {
-                    i256::upcast_scalar(value, decimal_i256_size.unwrap())
+                DataType::Decimal(DecimalDataType::Decimal256(size)) => {
+                    Decimal256Type::upcast_decimal_scalar(scalar, *size)
                 }
-                _ => scalar,
+                _ => T::upcast_scalar(scalar),
             };
             format!("{}", scalar)
         };
@@ -434,7 +419,9 @@ fn calculate_bucket_max_values<T: Ord>(value_map: &BTreeMap<T, u64>, num_buckets
 ///
 /// `return` the histogram buckets.
 fn build_histogram<T>(value_map: &BTreeMap<T, u64>, max_num_buckets: u64) -> Vec<Bucket<T>>
-where T: Ord + Clone {
+where
+    T: Ord + Clone,
+{
     let mut buckets = Vec::new();
 
     // If the input map is empty, there is nothing to build.
@@ -535,6 +522,20 @@ mod tests {
     // Test case 2: Test when input map has only one element.
     #[test]
     fn test_single_element() {
+        let max_num_buckets = 10;
+        let value_map = create_test_map(vec![1], vec![5]);
+        let buckets = build_histogram::<u32>(&value_map, max_num_buckets);
+
+        assert_eq!(buckets.len(), 1);
+        assert_eq!(buckets[0].lower, 1);
+        assert_eq!(buckets[0].upper, 1);
+        assert_eq!(buckets[0].ndv, 1);
+        assert_eq!(buckets[0].count, 5);
+        assert_eq!(buckets[0].pre_sum, 0);
+    }
+
+    #[test]
+    fn test_single_decimal_element() {
         let max_num_buckets = 10;
         let value_map = create_test_map(vec![1], vec![5]);
         let buckets = build_histogram::<u32>(&value_map, max_num_buckets);

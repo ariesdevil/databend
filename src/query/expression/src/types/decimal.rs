@@ -104,16 +104,16 @@ impl<Num: Decimal> ValueType for DecimalType<Num> {
         )))
     }
 
-    fn upcast_scalar(scalar: Self::Scalar) -> Scalar {
-        Num::upcast_scalar(scalar, Num::default_decimal_size())
+    fn upcast_scalar(_scalar: Self::Scalar) -> Scalar {
+        unimplemented!("using `upcast_decimal_scalar` instead")
     }
 
-    fn upcast_column(col: Self::Column) -> Column {
-        Num::upcast_column(col, Num::default_decimal_size())
+    fn upcast_column(_col: Self::Column) -> Column {
+        unimplemented!("using `upcast_decimal_column` instead")
     }
 
-    fn upcast_domain(domain: Self::Domain) -> Domain {
-        Num::upcast_domain(domain, Num::default_decimal_size())
+    fn upcast_domain(_domain: Self::Domain) -> Domain {
+        unimplemented!("using `upcast_decimal_domain` instead")
     }
 
     fn column_len(col: &Self::Column) -> usize {
@@ -231,6 +231,20 @@ impl<Num: Decimal> ArgType for DecimalType<Num> {
     }
 }
 
+impl<Num: Decimal> DecimalType<Num> {
+    pub fn upcast_decimal_scalar(scalar: Num, decimal_size: DecimalSize) -> Scalar {
+        Num::upcast_scalar(scalar, decimal_size)
+    }
+
+    pub fn upcast_decimal_column(col: Buffer<Num>, decimal_size: DecimalSize) -> Column {
+        Num::upcast_column(col, decimal_size)
+    }
+
+    pub fn upcast_decimal_domain(domain: SimpleDomain<Num>, decimal_size: DecimalSize) -> Domain {
+        Num::upcast_domain(domain, decimal_size)
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, EnumAsInner)]
 pub enum DecimalDataType {
     Decimal128(DecimalSize),
@@ -342,8 +356,6 @@ pub trait Decimal:
     fn min_for_precision(precision: u8) -> Self;
     fn max_for_precision(precision: u8) -> Self;
 
-    fn default_decimal_size() -> DecimalSize;
-
     fn from_float(value: f64) -> Self;
     fn from_i128<U: Into<i128>>(value: U) -> Self;
 
@@ -440,13 +452,6 @@ impl Decimal for i128 {
 
     fn max_for_precision(to_precision: u8) -> Self {
         MAX_DECIMAL_FOR_EACH_PRECISION[to_precision as usize - 1]
-    }
-
-    fn default_decimal_size() -> DecimalSize {
-        DecimalSize {
-            precision: MAX_DECIMAL128_PRECISION,
-            scale: 0,
-        }
     }
 
     fn to_column_from_buffer(value: Buffer<Self>, size: DecimalSize) -> DecimalColumn {
@@ -644,13 +649,6 @@ impl Decimal for i256 {
 
     fn max_for_precision(to_precision: u8) -> Self {
         MAX_DECIMAL256_BYTES_FOR_EACH_PRECISION[to_precision as usize - 1]
-    }
-
-    fn default_decimal_size() -> DecimalSize {
-        DecimalSize {
-            precision: MAX_DECIMAL256_PRECISION,
-            scale: 0,
-        }
     }
 
     fn from_float(value: f64) -> Self {
@@ -1061,12 +1059,12 @@ impl DecimalColumnBuilder {
             }
             (DecimalColumnBuilder::Decimal128(_, _), DecimalColumn::Decimal256(_, _)) =>
                 unreachable!(
-                    "unable append column(data type: Decimal256) into builder(data type: Decimal128)"
-                ),
+                "unable append column(data type: Decimal256) into builder(data type: Decimal128)"
+            ),
             (DecimalColumnBuilder::Decimal256(_, _), DecimalColumn::Decimal128(_, _)) =>
                 unreachable!(
-                    "unable append column(data type: Decimal128) into builder(data type: Decimal256)"
-                ),
+                "unable append column(data type: Decimal128) into builder(data type: Decimal256)"
+            ),
         })
     }
 
